@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Mathematics Simulator — Explore mathematics beyond the graph.";
+export const alt = "AXIOM — Explore mathematics beyond the graph.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -89,7 +89,7 @@ export default function OpenGraphImage() {
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ fontSize: 30, color: "#1b1a16", fontWeight: 600 }}>
-              Mathematics Simulator
+              AXIOM
             </div>
             <div style={{ fontSize: 22, color: "#6e6b60" }}>
               functions · fractals · dynamics · topology · 4D geometry

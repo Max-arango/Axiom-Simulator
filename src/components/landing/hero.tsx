@@ -51,7 +51,7 @@ export function Hero() {
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Button asChild size="lg" className="font-semibold shadow-none">
                   <Link href={SITE.simulatorPath} data-cta="hero-simulator">
-                    Open Simulator
+                    Open AXIOM
                     <ArrowUpRight aria-hidden="true" />
                   </Link>
                 </Button>

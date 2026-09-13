@@ -51,7 +51,7 @@ export function Navbar() {
         <a
           href="#top"
           className="focusable rounded-md transition-opacity hover:opacity-80"
-          aria-label="Mathematics Simulator — back to top"
+          aria-label="AXIOM — back to top"
         >
           <Logo />
         </a>
@@ -74,7 +74,7 @@ export function Navbar() {
             href={SITE.github}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Mathematics Simulator on GitHub"
+            aria-label="AXIOM on GitHub"
             className="focusable hidden size-9 items-center justify-center rounded-md text-graphite transition-colors hover:bg-secondary hover:text-ink sm:inline-flex"
           >
             <Github className="size-[18px]" aria-hidden="true" />
@@ -85,7 +85,7 @@ export function Navbar() {
             className="hidden font-semibold shadow-none lg:inline-flex"
           >
             <Link href={SITE.simulatorPath} data-cta="navbar-simulator">
-              Open Simulator
+              Open AXIOM
               <ArrowUpRight aria-hidden="true" />
             </Link>
           </Button>
@@ -135,7 +135,7 @@ export function Navbar() {
                 onClick={() => setOpen(false)}
                 data-cta="navbar-simulator"
               >
-                Open Simulator
+                Open AXIOM
                 <ArrowUpRight aria-hidden="true" />
               </Link>
             </Button>

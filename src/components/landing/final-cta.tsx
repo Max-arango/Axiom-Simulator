@@ -53,7 +53,7 @@ export function FinalCta() {
               className="h-11 bg-[#c2451d] px-7 text-[15px] font-semibold text-[#fdf9f4] shadow-none hover:bg-[#d0522a]"
             >
               <Link href={SITE.simulatorPath} data-cta="final-simulator">
-                Open Mathematics Simulator
+                Open AXIOM
                 <ArrowUpRight aria-hidden="true" />
               </Link>
             </Button>

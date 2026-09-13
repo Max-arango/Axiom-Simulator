@@ -101,7 +101,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         <DialogHeader>
           <p className="mono-label text-muted-foreground">Acceso a la plataforma</p>
           <DialogTitle className="text-left text-xl font-semibold tracking-tight">
-            Inicia sesión en <span className="math text-primary">Mathematics Simulator</span>
+            Inicia sesión en <span className="math text-primary">AXIOM</span>
           </DialogTitle>
           <DialogDescription className="text-left">
             Tus credenciales viajan cifradas y tu contraseña se guarda con Argon2id.

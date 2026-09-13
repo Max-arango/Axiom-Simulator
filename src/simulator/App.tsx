@@ -110,7 +110,7 @@ function ModeNav() {
       >
         <LogoMark className="size-6 shrink-0" />
         <span className="font-display text-[19px] leading-none tracking-tight">
-          Mathematics <em className="text-vermilion-400">Simulator</em>
+          <em className="text-vermilion-400">AXIOM</em>
         </span>
       </button>
       {tabs.map((t) => (

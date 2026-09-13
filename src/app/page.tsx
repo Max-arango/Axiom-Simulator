@@ -15,7 +15,7 @@ import { FinalCta } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
 
 /**
- * Mathematics Simulator — landing.
+ * AXIOM — landing.
  * One route, one narrative: a live mathematical exhibit from top to bottom.
  * Rhythm: paper → paper → paper → phenomenon (void) → paper → paper → …
  */

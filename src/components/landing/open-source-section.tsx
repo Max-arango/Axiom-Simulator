@@ -85,7 +85,7 @@ export function OpenSourceSection() {
                     <em className="text-vermilion">explorable.</em>
                   </>
                 }
-                description="Mathematics Simulator is developed in the open, under an MIT license. Inspect the engine, extend a workspace, or fix a bug — the repository is the documentation."
+                description="AXIOM is developed in the open, under an MIT license. Inspect the engine, extend a workspace, or fix a bug — the repository is the documentation."
               />
             </Reveal>
 

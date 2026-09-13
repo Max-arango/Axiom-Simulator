@@ -1,9 +1,9 @@
 /**
- * Site-wide constants for the Mathematics Simulator landing.
+ * Site-wide constants for the AXIOM landing.
  * All external links are real, evidence-based URLs from the repository README.
  */
 export const SITE = {
-  name: "Mathematics Simulator",
+  name: "AXIOM",
   url: "https://mathematics-simulator.vercel.app",
   /** Internal route for the ported simulator SPA (was `url`, now same-app). */
   simulatorPath: "/simulator",

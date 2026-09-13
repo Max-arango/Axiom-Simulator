@@ -42,7 +42,7 @@ const jetbrains = localFont({
 });
 
 const SITE_URL = "https://mathematics-simulator.vercel.app";
-const SITE_TITLE = "Mathematics Simulator — Explore Mathematics";
+const SITE_TITLE = "AXIOM — Explore Mathematics";
 const SITE_DESCRIPTION =
   "An open-source mathematical exploration environment for graphing, fractals, topology, dynamics, geometry, and more.";
 
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_TITLE,
-    template: "%s — Mathematics Simulator",
+    template: "%s — AXIOM",
   },
   description: SITE_DESCRIPTION,
   keywords: [
@@ -75,7 +75,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: SITE_URL,
-    siteName: "Mathematics Simulator",
+    siteName: "AXIOM",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     locale: "en_US",

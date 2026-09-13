@@ -203,7 +203,7 @@ export function HomeView() {
         <div className="flex items-center gap-2.5 pt-8 text-ink">
           <LogoMark className="size-6" />
           <span className="font-display text-lg leading-none tracking-tight">
-            Mathematics <em className="text-vermilion-400">Simulator</em>
+            <em className="text-vermilion-400">AXIOM</em>
           </span>
         </div>
 
