@@ -4,7 +4,7 @@ import { SITE } from "@/lib/site";
 
 const PROJECT_LINKS = [
   { label: "GitHub", href: SITE.github, external: true, icon: Github },
-  { label: "Simulator", href: SITE.url, external: true, icon: ArrowUpRight },
+  { label: "Simulator", href: SITE.simulatorPath, external: false, icon: ArrowUpRight },
   { label: "Docs", href: SITE.github, external: true, icon: BookOpen },
 ] as const;
 

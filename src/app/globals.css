@@ -370,3 +370,133 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ===== Ported from Mathematics Simulator (index.css) =====
+   The simulator runs inside `.dark .sim-shell` (see simulator-view.tsx).
+   The landing already ships a `.dark` theme whose --foreground/--background/
+   --muted-foreground/--border values equal the simulator's intended dark
+   tokens (ink/void/graphite/line), plus fixed --color-void / --color-cream /
+   --color-amber in @theme. So we DELIBERATELY do NOT re-append the simulator's
+   full @theme or its global html/body/#root reset (that would clobber the
+   landing's light mode). We add only what's missing:
+     1. the vermilion accent ramp (100–600) the simulator uses,
+     2. the literal @font-face names referenced by /fonts/*.woff2,
+     3. the `.fade-up` launcher animation,
+     4. a `.sim-shell` scoped full-bleed reset,
+     5. native range-input styling scoped to `.sim-shell` (landing uses
+        `.lab-range`; a GLOBAL input[type=range] rule would out-specificity it).
+   ========================================================================== */
+
+@theme {
+  /* Vermilion ramp — simulator accent (light→dark). New keys; the landing
+     already defines bare --color-vermilion / --color-vermilion-deep. */
+  --color-vermilion-100: #f8d7c6;
+  --color-vermilion-200: #f2ad8b;
+  --color-vermilion-300: #ea865c;
+  --color-vermilion-400: #e0673d;
+  --color-vermilion-500: #c2451d;
+  --color-vermilion-600: #a33715;
+}
+
+/* Self-hosted type deck used by the simulator (literal family names). */
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-var.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/instrument-serif.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/instrument-serif-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jbmono-var.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer utilities {
+  /* Staggered entrance (simulator launcher cards) — landing has no `.fade-up`. */
+  .fade-up {
+    opacity: 0;
+    animation: fade-up 0.6s cubic-bezier(0.16, 0.84, 0.32, 1) forwards;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up {
+    opacity: 1;
+    animation: none;
+    transform: none;
+  }
+}
+
+/* Full-viewport shell for the /simulator route. Reproduces the simulator's
+   original `#root { height:100% }` via position:fixed; inset:0 so it fills the
+   viewport regardless of the landing layout. Kept off html/body so the landing
+   page keeps scrolling and its own background. */
+.sim-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #131311;
+  color: #f0eee5;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Compact range sliders — vermilion thumb on a faint ink track. Scoped to the
+   simulator so it does not override the landing's `.lab-range` (element+attr
+   selectors out-specify a single class). */
+.sim-shell input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(240, 238, 229, 0.14);
+  outline: none;
+}
+.sim-shell input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--color-vermilion-400);
+  cursor: pointer;
+  box-shadow: 0 0 0 1.5px rgba(240, 238, 229, 0.28);
+}
+.sim-shell input[type="range"]::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-vermilion-400);
+  cursor: pointer;
+  box-shadow: 0 0 0 1.5px rgba(240, 238, 229, 0.28);
+}

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowUpRight, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/landing/reveal";
@@ -51,15 +52,10 @@ export function FinalCta() {
               size="lg"
               className="h-11 bg-[#c2451d] px-7 text-[15px] font-semibold text-[#fdf9f4] shadow-none hover:bg-[#d0522a]"
             >
-              <a
-                href={SITE.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-cta="final-simulator"
-              >
+              <Link href={SITE.simulatorPath} data-cta="final-simulator">
                 Open Mathematics Simulator
                 <ArrowUpRight aria-hidden="true" />
-              </a>
+              </Link>
             </Button>
             <Button
               asChild

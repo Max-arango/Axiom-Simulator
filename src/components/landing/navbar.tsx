@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Menu, X, Github, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/landing/logo";
@@ -83,15 +84,10 @@ export function Navbar() {
             size="sm"
             className="hidden font-semibold shadow-none lg:inline-flex"
           >
-            <a
-              href={SITE.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-cta="navbar-simulator"
-            >
+            <Link href={SITE.simulatorPath} data-cta="navbar-simulator">
               Open Simulator
               <ArrowUpRight aria-hidden="true" />
-            </a>
+            </Link>
           </Button>
 
           <ThemeToggle />
@@ -134,15 +130,14 @@ export function Navbar() {
           ))}
           <li className="flex items-center gap-2 pt-2">
             <Button asChild className="flex-1 font-semibold shadow-none">
-              <a
-                href={SITE.url}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href={SITE.simulatorPath}
                 onClick={() => setOpen(false)}
+                data-cta="navbar-simulator"
               >
                 Open Simulator
                 <ArrowUpRight aria-hidden="true" />
-              </a>
+              </Link>
             </Button>
             <Button
               asChild

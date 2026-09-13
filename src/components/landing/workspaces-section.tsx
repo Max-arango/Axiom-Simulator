@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Reveal } from "@/components/landing/reveal";
 import { SectionHeading } from "@/components/landing/section-heading";
@@ -33,10 +34,8 @@ export function WorkspacesSection() {
             const dark = ws.id === "fractal_lab" || ws.id === "four_d";
             return (
               <Reveal key={ws.id} delay={(i % 3) * 70}>
-                <a
-                  href={SITE.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={SITE.simulatorPath}
                   className="group focusable block overflow-hidden rounded-lg border border-line bg-card shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-lg"
                 >
                   <div
@@ -75,7 +74,7 @@ export function WorkspacesSection() {
                       />
                     </span>
                   </div>
-                </a>
+                </Link>
               </Reveal>
             );
           })}

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowDown, ArrowUpRight, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HeroVisualization } from "@/components/math/hero-visualization";
@@ -49,15 +50,10 @@ export function Hero() {
             <Reveal delay={210}>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Button asChild size="lg" className="font-semibold shadow-none">
-                  <a
-                    href={SITE.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-cta="hero-simulator"
-                  >
+                  <Link href={SITE.simulatorPath} data-cta="hero-simulator">
                     Open Simulator
                     <ArrowUpRight aria-hidden="true" />
-                  </a>
+                  </Link>
                 </Button>
                 <Button
                   asChild

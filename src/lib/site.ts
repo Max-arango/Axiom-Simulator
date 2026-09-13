@@ -5,6 +5,8 @@
 export const SITE = {
   name: "Mathematics Simulator",
   url: "https://mathematics-simulator.vercel.app",
+  /** Internal route for the ported simulator SPA (was `url`, now same-app). */
+  simulatorPath: "/simulator",
   github: "https://github.com/Max-arango/Mathematics-simulator",
   license: "MIT",
   tagline: "Open-source mathematical exploration.",
