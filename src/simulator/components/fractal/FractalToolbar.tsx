@@ -13,6 +13,15 @@ function download(name: string, blob: Blob) {
   URL.revokeObjectURL(url);
 }
 
+function Stat({ k, v }: { k: string; v: string | number }) {
+  return (
+    <span className="mono-label text-graphite/70">
+      {k}
+      <b className="ml-1 font-mono text-[13px] text-vermilion-300">{v}</b>
+    </span>
+  );
+}
+
 /** Floating glass toolbar: fractal identity, live stats, and view actions. */
 export function FractalToolbar({
   stats,
@@ -54,12 +63,6 @@ export function FractalToolbar({
   const btn = "rounded-md px-2.5 py-1 text-xs text-graphite transition hover:bg-white/10 hover:text-ink focusable";
   const iconBtn =
     "flex size-8 items-center justify-center rounded-md text-[15px] text-graphite transition hover:bg-white/10 hover:text-ink focusable";
-  const Stat = ({ k, v }: { k: string; v: string | number }) => (
-    <span className="mono-label text-graphite/70">
-      {k}
-      <b className="ml-1 font-mono text-[13px] text-vermilion-300">{v}</b>
-    </span>
-  );
 
   return (
     <div className="absolute inset-x-3 top-3 z-20 flex h-12 items-center gap-3 rounded-xl border border-line bg-void-soft/80 px-2.5 shadow-lg backdrop-blur-xl">

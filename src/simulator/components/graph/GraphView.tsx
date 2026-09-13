@@ -20,7 +20,7 @@ export function GraphView() {
 
   // Slider animation driver (needs the live scene env to resolve bounds).
   const sceneRef = useRef<Scene>(scene);
-  sceneRef.current = scene;
+  useEffect(() => { sceneRef.current = scene; }, [scene]);
   const rawRef = useRef<{ name: string | null; value: number }>({ name: null, value: 0 });
   useEffect(() => {
     let raf = 0;

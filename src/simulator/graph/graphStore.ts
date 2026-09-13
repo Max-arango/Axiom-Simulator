@@ -7,7 +7,7 @@ export const PLOT_COLORS = ["#38e0c8", "#f26d6d", "#7c9cff", "#f2c94c", "#bb6bd9
 let idSeq = 1;
 const newId = () => `e${idSeq++}`;
 
-export interface ExprLine extends SceneInput {}
+export type ExprLine = SceneInput;
 
 export type AnalysisTool = "locate" | "derivative" | "integral";
 export type AnimMode = "loop" | "pingpong";
