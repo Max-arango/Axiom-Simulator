@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { Analytics } from "@vercel/analytics/next";
 
 /* Self-hosted fonts (downloaded from Google Fonts) — deterministic,
    offline-safe, and privacy-friendly. */
@@ -115,6 +116,7 @@ export default function RootLayout({
             <Toaster position="top-right" closeButton />
           </AuthProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
