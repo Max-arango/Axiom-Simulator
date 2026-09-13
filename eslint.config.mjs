@@ -7,6 +7,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
+  // exhaustive-deps is off, so the ported simulator's `eslint-disable-next-line
+  // react-hooks/exhaustive-deps` comments read as "unused" — but they still gate the
+  // react-hooks v6 compiler rules (refs/immutability/set-state), so they are load-bearing.
+  // Silence the false "unused directive" report; real rule violations still surface.
+  linterOptions: { reportUnusedDisableDirectives: "off" },
   rules: {
     // TypeScript rules
     "@typescript-eslint/no-explicit-any": "off",
@@ -14,8 +19,7 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "@typescript-eslint/no-non-null-assertion": "off",
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/prefer-as-const": "off",
-    "@typescript-eslint/no-unused-disable-directive": "off",
-    
+
     // React rules
     "react-hooks/exhaustive-deps": "off",
     "react-hooks/purity": "off",

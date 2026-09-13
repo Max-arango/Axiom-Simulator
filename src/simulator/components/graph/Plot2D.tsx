@@ -223,7 +223,7 @@ export function Plot2D({ scene, onTrace }: { scene: Scene; onTrace: (t: { x: num
         setView((v) => ({ ...v, cx: v.cx - dx / v.scale, cy: v.cy + dy / v.scale }));
       } else {
         const x = pxToX(e.clientX - r.left, r);
-        d.mode === "a" ? setA(x) : setB(x);
+        if (d.mode === "a") setA(x); else setB(x);
       }
     } else {
       const mx = e.clientX - r.left, my = e.clientY - r.top;
