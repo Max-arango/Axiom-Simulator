@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 /* Self-hosted fonts (downloaded from Google Fonts) — deterministic,
    offline-safe, and privacy-friendly. */
@@ -117,6 +118,7 @@ export default function RootLayout({
           </AuthProvider>
         </ThemeProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
