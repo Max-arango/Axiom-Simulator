@@ -104,7 +104,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
             Inicia sesión en <span className="math text-primary">AXIOM</span>
           </DialogTitle>
           <DialogDescription className="text-left">
-            Tus credenciales viajan cifradas y tu contraseña se guarda con Argon2id.
+            Tus credenciales viajan cifradas y se gestionan de forma segura con Supabase.
           </DialogDescription>
         </DialogHeader>
 
@@ -206,8 +206,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                   onChange={(e) => setRegPassword(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Mínimo 8 caracteres, con mayúscula, minúscula y un número. Se guarda con
-                  Argon2id y una sal única.
+                  Mínimo 8 caracteres, con mayúscula, minúscula y un número. Se
+                  gestiona de forma segura con Supabase.
                 </p>
               </div>
 

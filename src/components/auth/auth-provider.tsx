@@ -9,11 +9,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 /**
- * Client-side auth state, hydrated from the HttpOnly session cookie via
- * /api/auth/me. The cookie itself is never readable from JS — the server
- * remains the single source of truth.
+ * Client-side auth state, backed by Supabase Auth. The Supabase browser
+ * client holds the session in cookies; `buildUser()` composes a ClientUser
+ * from the auth user plus the `profiles` / `permissions` rows.
  */
 
 export interface ClientUser {
@@ -29,7 +30,7 @@ export interface ClientUser {
 
 interface AuthContextValue {
   user: ClientUser | null;
-  /** True until the initial /api/auth/me round-trip resolves. */
+  /** True until the initial session lookup resolves. */
   loading: boolean;
   refresh: () => Promise<void>;
   login: (email: string, password: string) => Promise<ClientUser>;
@@ -49,84 +50,105 @@ export class AuthRequestError extends Error {
   }
 }
 
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      ...init,
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    });
-  } catch {
-    throw new AuthRequestError(0, "No se pudo conectar con el servidor.");
-  }
-  let data: unknown = null;
-  try {
-    data = await res.json();
-  } catch {
-    /* non-JSON body */
-  }
-  if (!res.ok) {
-    const err = (data ?? {}) as { error?: string; retryAfterSeconds?: number };
-    throw new AuthRequestError(
-      res.status,
-      err.error ?? "Ocurrió un error inesperado.",
-      err.retryAfterSeconds,
-    );
-  }
-  return data as T;
-}
-
-interface MeResponse {
-  user: ClientUser | null;
-}
-interface AuthResponse {
-  user: ClientUser;
+/** Map the handful of Supabase auth messages we surface to Spanish copy. */
+function translateAuthError(msg: string): string {
+  if (msg.includes("Invalid login credentials")) return "Correo o contraseña incorrectos.";
+  if (msg.includes("User already registered")) return "Ese correo ya está registrado.";
+  if (msg.includes("Password should be at least"))
+    return "La contraseña es demasiado corta (mínimo 8 caracteres).";
+  return msg;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [supabase] = useState(() => createClient());
   const [user, setUser] = useState<ClientUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const buildUser = useCallback(async (): Promise<ClientUser | null> => {
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    if (!authUser) return null;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, display_name")
+      .eq("id", authUser.id)
+      .maybeSingle();
+
+    const { data: perms } = await supabase
+      .from("permissions")
+      .select("key")
+      .eq("user_id", authUser.id);
+
+    return {
+      id: authUser.id,
+      email: authUser.email ?? "",
+      name:
+        profile?.display_name ??
+        ((authUser.user_metadata?.display_name as string | undefined) ?? null),
+      role: profile?.role === "admin" ? "ADMIN" : "USER",
+      isActive: true,
+      permissions: (perms ?? []).map((p) => p.key),
+      createdAt: authUser.created_at,
+      lastLoginAt: authUser.last_sign_in_at ?? null,
+    };
+  }, [supabase]);
+
   const refresh = useCallback(async () => {
-    try {
-      const data = await requestJson<MeResponse>("/api/auth/me");
-      setUser(data.user);
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    setUser(await buildUser());
+    setLoading(false);
+  }, [buildUser]);
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
-
-  const login = useCallback(async (email: string, password: string) => {
-    const data = await requestJson<AuthResponse>("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      void refresh();
     });
-    setUser(data.user);
-    return data.user;
-  }, []);
+    return () => sub.subscription.unsubscribe();
+  }, [supabase, refresh]);
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw new AuthRequestError(400, translateAuthError(error.message));
+      const u = await buildUser();
+      setUser(u);
+      if (!u) throw new AuthRequestError(400, "No se pudo cargar la sesión.");
+      return u;
+    },
+    [supabase, buildUser],
+  );
 
   const register = useCallback(
     async (email: string, name: string | undefined, password: string) => {
-      const data = await requestJson<AuthResponse>("/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify({ email, name, password }),
+      const username = (name || email.split("@")[0] || "user")
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "_")
+        .slice(0, 32);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { display_name: name ?? null, username } },
       });
-      setUser(data.user);
-      return data.user;
+      if (error) throw new AuthRequestError(400, translateAuthError(error.message));
+      if (!data.session)
+        throw new AuthRequestError(
+          200,
+          "Cuenta creada. Revisa tu correo para confirmarla antes de entrar.",
+        );
+      const u = await buildUser();
+      setUser(u);
+      if (!u) throw new AuthRequestError(400, "No se pudo cargar la sesión.");
+      return u;
     },
-    [],
+    [supabase, buildUser],
   );
 
   const logout = useCallback(async () => {
-    await requestJson<{ ok: boolean }>("/api/auth/logout", { method: "POST" });
+    await supabase.auth.signOut();
     setUser(null);
-  }, []);
+  }, [supabase]);
 
   const value = useMemo(
     () => ({ user, loading, refresh, login, register, logout }),

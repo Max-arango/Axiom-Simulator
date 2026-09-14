@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
 
 interface ChangePasswordDialogProps {
   open: boolean;
@@ -21,8 +22,8 @@ interface ChangePasswordDialogProps {
 }
 
 /**
- * Self-service password change. The server verifies the current password,
- * re-hashes with a fresh unique Argon2id salt and revokes all other sessions.
+ * Self-service password change. Reauthenticates with the current password via
+ * Supabase, then updates it.
  */
 export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialogProps) {
   const [current, setCurrent] = useState("");
@@ -52,18 +53,30 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
     }
     setPending(true);
     try {
-      const res = await fetch("/api/auth/change-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user?.email) {
+        setError("Tu sesión no es válida. Vuelve a entrar.");
+        return;
+      }
+      // verify current password by reauthenticating
+      const { error: reauthErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: current,
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setError(data.error ?? "No se pudo cambiar la contraseña.");
+      if (reauthErr) {
+        setError("La contraseña actual es incorrecta.");
+        return;
+      }
+      const { error: updErr } = await supabase.auth.updateUser({ password: next });
+      if (updErr) {
+        setError(updErr.message);
         return;
       }
       onOpenChange(false);
-      toast.success("Contraseña actualizada. Las demás sesiones fueron cerradas.");
+      toast.success("Contraseña actualizada.");
     } catch {
       setError("Error de conexión. Inténtalo de nuevo.");
     } finally {
@@ -83,8 +96,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
         <DialogHeader>
           <DialogTitle className="text-left">Cambiar contraseña</DialogTitle>
           <DialogDescription className="text-left">
-            Se aplicará un hash Argon2id con una sal nueva y única, y se cerrarán tus
-            otras sesiones activas.
+            Introduce tu contraseña actual para confirmar el cambio.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
