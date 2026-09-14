@@ -1,185 +1,160 @@
-import { z } from "zod";
-import { db } from "@/lib/db";
-import { hashPassword, validatePassword } from "@/lib/auth/password";
 import {
-  ApiError,
-  handleApiError,
-  isValidPermissionKey,
-  readJson,
   requireAdmin,
-} from "@/lib/auth/api";
-import {
-  SESSION_COOKIE,
-  destroyUserSessions,
-  sha256Token,
-} from "@/lib/auth/session";
-import { mapAdminUser } from "@/lib/auth/serialize";
-import { cookies } from "next/headers";
+  handleApiError,
+  jsonOk,
+  readJson,
+  ApiError,
+  isValidPermissionKey,
+} from "@/lib/admin/api";
+import { createAdminClient, toAdminUser } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-const activeSessionsFilter = (now: Date) => ({
-  where: { expiresAt: { gt: now } },
-  select: { id: true },
-});
+// Supabase ban with an effectively-permanent duration = "deactivated".
+const BAN_FOREVER = "876000h"; // 100 years
 
-const includeForMap = {
-  permissions: { select: { key: true } },
-  emails: { orderBy: [{ isPrimary: "desc" as const }, { address: "asc" as const }] },
-};
-
-const patchSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, { message: "El nombre debe tener al menos 2 caracteres." })
-    .max(80, { message: "El nombre no puede superar los 80 caracteres." })
-    .optional(),
-  role: z.enum(["USER", "ADMIN"], { message: "Rol inválido." }).optional(),
-  isActive: z.boolean().optional(),
-  permissions: z.array(z.string()).max(20).optional(),
-  password: z.string().min(1).max(128).optional(),
-});
-
-/** Guard: the system must always keep at least one ACTIVE admin. */
-async function ensureNotLastAdmin(targetId: string, demoting: boolean, deactivating: boolean) {
+/** Guard: keep at least one admin. Throws if `id` is the last admin being demoted/deactivated. */
+async function ensureNotLastAdmin(
+  admin: ReturnType<typeof createAdminClient>,
+  id: string,
+  demoting: boolean,
+  deactivating: boolean,
+) {
   if (!demoting && !deactivating) return;
-  const otherActiveAdmins = await db.user.count({
-    where: { role: "ADMIN", isActive: true, id: { not: targetId } },
-  });
-  if (otherActiveAdmins === 0) {
-    throw new ApiError(400, "No puedes quitar al último administrador activo del sistema.");
+  const { count } = await admin
+    .from("profiles")
+    .select("*", { count: "exact", head: true })
+    .eq("role", "admin")
+    .neq("id", id);
+  if ((count ?? 0) === 0) {
+    throw new ApiError(400, "No puedes quitar al último administrador del sistema.");
   }
 }
 
 /**
- * PATCH /api/admin/users/{id} — edit name, role, isActive, granular
- * permissions and/or reset the password (Argon2id + fresh unique salt).
- * ADMIN ONLY. Password reset and deactivation revoke the user's sessions.
+ * PATCH /api/admin/users/{id} — edit name, role, isActive, permissions and/or
+ * reset the password via the Supabase Auth admin API + profiles. ADMIN ONLY.
  */
 export async function PATCH(req: Request, ctx: RouteContext) {
   try {
-    const admin = await requireAdmin();
+    await requireAdmin();
     const { id } = await ctx.params;
+    const body = (await readJson(req)) as Record<string, unknown> | null;
+    if (!body || typeof body !== "object") throw new ApiError(400, "Datos inválidos.");
 
-    const parsed = patchSchema.safeParse(await readJson(req));
-    if (!parsed.success) {
-      throw new ApiError(400, parsed.error.issues[0]?.message ?? "Datos inválidos.");
-    }
-    const data = parsed.data;
-    if (Object.keys(data).length === 0) {
+    const name = typeof body.name === "string" ? body.name.trim() : undefined;
+    const role = body.role === "ADMIN" ? "ADMIN" : body.role === "USER" ? "USER" : undefined;
+    const isActive = typeof body.isActive === "boolean" ? body.isActive : undefined;
+    const permissions = Array.isArray(body.permissions)
+      ? (body.permissions.filter((k) => typeof k === "string") as string[])
+      : undefined;
+    const password = typeof body.password === "string" ? body.password : undefined;
+
+    if (name === undefined && role === undefined && isActive === undefined && permissions === undefined && password === undefined) {
       throw new ApiError(400, "No hay cambios que aplicar.");
     }
-    if (data.password) {
-      const policyError = validatePassword(data.password);
-      if (policyError) throw new ApiError(400, policyError);
+    if (password !== undefined && password.length < 8) {
+      throw new ApiError(400, "La contraseña debe tener al menos 8 caracteres.");
     }
 
-    const target = await db.user.findUnique({ where: { id }, select: { id: true, role: true } });
-    if (!target) throw new ApiError(404, "Usuario no encontrado.");
+    const admin = createAdminClient();
+
+    // Confirm the target exists.
+    const { data: targetAuth, error: getErr } = await admin.auth.admin.getUserById(id);
+    if (getErr || !targetAuth?.user) throw new ApiError(404, "Usuario no encontrado.");
+    const { data: targetProfile } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", id)
+      .maybeSingle();
 
     await ensureNotLastAdmin(
+      admin,
       id,
-      target.role === "ADMIN" && data.role === "USER",
-      data.isActive === false,
+      targetProfile?.role === "admin" && role === "USER",
+      isActive === false,
     );
 
-    const permissionKeys = data.permissions
-      ? Array.from(new Set(data.permissions.filter(isValidPermissionKey)))
-      : null;
-
-    await db.$transaction(async (tx) => {
-      const userUpdate: { name?: string; role?: "USER" | "ADMIN"; isActive?: boolean } = {};
-      if (data.name !== undefined) userUpdate.name = data.name;
-      if (data.role !== undefined) userUpdate.role = data.role;
-      if (data.isActive !== undefined) userUpdate.isActive = data.isActive;
-      if (Object.keys(userUpdate).length > 0) {
-        await tx.user.update({ where: { id }, data: userUpdate });
-      }
-
-      if (permissionKeys) {
-        await tx.permission.deleteMany({ where: { userId: id } });
-        if (permissionKeys.length > 0) {
-          await tx.permission.createMany({
-            data: permissionKeys.map((key) => ({ userId: id, key, grantedBy: admin.email })),
-          });
-        }
-      }
-
-      if (data.password !== undefined) {
-        const { hash, salt } = await hashPassword(data.password);
-        await tx.passwordCredential.upsert({
-          where: { userId: id },
-          update: { hash, salt, lastChangedAt: new Date() },
-          create: { userId: id, hash, salt },
-        });
-      }
-    });
-
-    // Side effects on sessions.
-    if (data.isActive === false) {
-      // Deactivation: kill every session immediately.
-      await destroyUserSessions(id);
-    } else if (data.password !== undefined) {
-      // Password reset: force re-login everywhere (keep the admin's own
-      // session when the admin resets their own password here).
-      const currentToken = (await cookies()).get(SESSION_COOKIE)?.value;
-      const currentHash = currentToken ? sha256Token(currentToken) : undefined;
-      await destroyUserSessions(id, id === admin.id ? currentHash : undefined);
+    // profiles updates
+    const profileUpdate: { display_name?: string; role?: string } = {};
+    if (name !== undefined) profileUpdate.display_name = name;
+    if (role !== undefined) profileUpdate.role = role === "ADMIN" ? "admin" : "user";
+    if (Object.keys(profileUpdate).length > 0) {
+      await admin.from("profiles").update(profileUpdate).eq("id", id);
     }
 
-    const now = new Date();
-    const fresh = await db.user.findUnique({
-      where: { id },
-      include: { ...includeForMap, sessions: activeSessionsFilter(now) },
-    });
-    if (!fresh) throw new ApiError(404, "Usuario no encontrado.");
+    // auth updates: ban/unban + password
+    if (isActive !== undefined) {
+      await admin.auth.admin.updateUserById(id, { ban_duration: isActive ? "none" : BAN_FOREVER });
+    }
+    if (password !== undefined) {
+      await admin.auth.admin.updateUserById(id, { password });
+    }
 
-    return Response.json(
-      { user: mapAdminUser(fresh) },
-      { status: 200, headers: { "Cache-Control": "no-store, max-age=0" } },
-    );
+    // permissions: replace the set
+    if (permissions !== undefined) {
+      const keys = Array.from(new Set(permissions.filter(isValidPermissionKey)));
+      await admin.from("permissions").delete().eq("user_id", id);
+      if (keys.length > 0) {
+        await admin.from("permissions").insert(keys.map((key) => ({ user_id: id, key })));
+      }
+    }
+
+    // Re-fetch fresh state
+    const { data: freshAuth } = await admin.auth.admin.getUserById(id);
+    const { data: freshProfile } = await admin
+      .from("profiles")
+      .select("display_name, role")
+      .eq("id", id)
+      .maybeSingle();
+    const { data: freshPerms } = await admin.from("permissions").select("key").eq("user_id", id);
+    if (!freshAuth?.user) throw new ApiError(404, "Usuario no encontrado.");
+
+    return jsonOk({
+      user: toAdminUser(freshAuth.user, freshProfile, (freshPerms ?? []).map((p) => p.key)),
+    });
   } catch (err) {
     return handleApiError(err);
   }
 }
 
 /**
- * DELETE /api/admin/users/{id} — delete a user. Cascades to password,
- * emails, sessions and permissions; audit attempts are kept (SetNull).
- * Self-deletion and last-admin deletion are blocked.
+ * DELETE /api/admin/users/{id} — remove a user (cascades the profile via FK).
+ * ADMIN ONLY. Self-deletion and last-admin deletion are blocked.
  */
 export async function DELETE(_req: Request, ctx: RouteContext) {
   try {
-    const admin = await requireAdmin();
+    const admin_ctx = await requireAdmin();
     const { id } = await ctx.params;
 
-    if (id === admin.id) {
-      throw new ApiError(400, "No puedes eliminar tu propia cuenta.");
-    }
+    if (id === admin_ctx.id) throw new ApiError(400, "No puedes eliminar tu propia cuenta.");
 
-    const target = await db.user.findUnique({
-      where: { id },
-      select: { id: true, role: true },
-    });
-    if (!target) throw new ApiError(404, "Usuario no encontrado.");
+    const admin = createAdminClient();
+    const { data: targetAuth, error: getErr } = await admin.auth.admin.getUserById(id);
+    if (getErr || !targetAuth?.user) throw new ApiError(404, "Usuario no encontrado.");
 
-    if (target.role === "ADMIN") {
-      const otherActiveAdmins = await db.user.count({
-        where: { role: "ADMIN", isActive: true, id: { not: id } },
-      });
-      if (otherActiveAdmins === 0) {
+    const { data: targetProfile } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", id)
+      .maybeSingle();
+    if (targetProfile?.role === "admin") {
+      const { count } = await admin
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "admin")
+        .neq("id", id);
+      if ((count ?? 0) === 0) {
         throw new ApiError(400, "No puedes eliminar al último administrador del sistema.");
       }
     }
 
-    await db.user.delete({ where: { id } });
-    return Response.json(
-      { ok: true },
-      { status: 200, headers: { "Cache-Control": "no-store, max-age=0" } },
-    );
+    const { error } = await admin.auth.admin.deleteUser(id);
+    if (error) throw new ApiError(400, error.message);
+
+    return jsonOk({ ok: true });
   } catch (err) {
     return handleApiError(err);
   }

@@ -1,54 +1,42 @@
-import { db } from "@/lib/db";
-import { requireAdmin, handleApiError } from "@/lib/auth/api";
-import { pruneExpiredSessions } from "@/lib/auth/session";
-import { mapLoginAttempt } from "@/lib/auth/serialize";
+import { requireAdmin, handleApiError, jsonOk } from "@/lib/admin/api";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 /**
- * GET /api/admin/overview — dashboard counters + 10 most recent attempts.
- * ADMIN ONLY (requireAdmin throws 401/403 otherwise).
+ * GET /api/admin/overview — dashboard counters. ADMIN ONLY.
+ * Note: Supabase does not expose an auth-attempt audit table, so
+ * failedAttempts24h / totalAttempts24h are 0 and recentAttempts is empty.
+ * activeSessions is not derivable from the admin API here → 0.
  */
 export async function GET() {
   try {
     await requireAdmin();
-    await pruneExpiredSessions();
+    const admin = createAdminClient();
 
-    const now = new Date();
-    const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const users = list?.users ?? [];
+    const now = Date.now();
+    const activeUsers = users.filter(
+      (u) => !(u.banned_until && new Date(u.banned_until).getTime() > now),
+    ).length;
 
-    const [
-      totalUsers,
-      activeUsers,
-      adminUsers,
-      activeSessions,
-      failedAttempts24h,
-      totalAttempts24h,
-      recentAttempts,
-    ] = await Promise.all([
-      db.user.count(),
-      db.user.count({ where: { isActive: true } }),
-      db.user.count({ where: { role: "ADMIN" } }),
-      db.session.count({ where: { expiresAt: { gt: now } } }),
-      db.loginAttempt.count({ where: { success: false, createdAt: { gte: since24h } } }),
-      db.loginAttempt.count({ where: { createdAt: { gte: since24h } } }),
-      db.loginAttempt.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
-    ]);
+    const { count: adminUsers } = await admin
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "admin");
 
-    return Response.json(
-      {
-        stats: {
-          totalUsers,
-          activeUsers,
-          adminUsers,
-          activeSessions,
-          failedAttempts24h,
-          totalAttempts24h,
-        },
-        recentAttempts: recentAttempts.map(mapLoginAttempt),
+    return jsonOk({
+      stats: {
+        totalUsers: users.length,
+        activeUsers,
+        adminUsers: adminUsers ?? 0,
+        activeSessions: 0,
+        failedAttempts24h: 0,
+        totalAttempts24h: 0,
       },
-      { status: 200, headers: { "Cache-Control": "no-store, max-age=0" } },
-    );
+      recentAttempts: [],
+    });
   } catch (err) {
     return handleApiError(err);
   }
