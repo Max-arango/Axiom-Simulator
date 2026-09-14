@@ -1,76 +1,37 @@
 -- ============================================================================
---  SUPERSEDED — DESIGN REFERENCE ONLY. Not the source of truth.
---  The applied, versioned data layer now lives in supabase/migrations/
---  (init_schema + rls + harden_functions), which is what is deployed to the
---  live project and adds profiles.role, permissions, presets, RLS and the
---  is_admin()/handle_new_user() helpers. Kept here for the design rationale.
--- ============================================================================
---  Mathematics Simulator - future Supabase data layer (schema.sql)
+--  Migration 1 — init_schema
+--  Mathematics Simulator / axiom — Supabase data layer (source of truth).
 -- ============================================================================
 --
---  Generated for Mathematics Simulator — future Supabase integration.
---  Landing currently runs without any backend.
+--  Supersedes supabase/schema.sql (kept only as a design banner now).
+--  Runs top-to-bottom on Supabase OR on a bare PostgreSQL instance:
+--    - Supabase: the auth schema / auth.users / auth.uid() already exist, so
+--      every `if not exists` / existence guard short-circuits — no clobber.
+--    - Bare PG: minimal shims are created so the file (and migration 2's RLS
+--      policies) parse and apply for local review.
 --
---  WHAT THIS FILE IS
---    A future-ready schema for the platform around Mathematics Simulator
---    (an open-source math exploration environment with 9 workspaces and a
---    single no-eval engine: lexer -> parser -> AST -> evaluator). It models
---    user profiles, saved projects, experiments, notebooks, curated
---    examples, workspace metadata and tags. The landing page is a single
---    route built on local mock data (src/data/workspaces.ts etc.); later
---    that data source can be swapped to Supabase, and this schema is the
---    contract it would read from.
+--  Idempotent by construction:
+--    - tables/indexes: create ... if not exists
+--    - enums:          DO blocks swallowing duplicate_object
+--    - triggers:       drop trigger if exists + create
+--    - functions:      create or replace (+ guarded create for the auth.uid shim)
+--    - comments:       comment on ... overwrites
 --
---  WHAT THIS FILE IS NOT
---    - NOT applied anywhere yet: no Supabase project consumes this file.
---    - NOT connected to the landing page at runtime in any way.
---
---  SECURITY - Row Level Security (RLS)
---    RLS is INTENTIONALLY NOT ENABLED yet: there is no exposed API, no
---    anon/authenticated role access, and no real data. Before ANY
---    production use you MUST:
---      1. Enable RLS on every table (statements are prepared, commented
---         out, in the "FUTURE: Row Level Security" block at the end of
---         this file).
---      2. Write policies for every table: owner-only writes on
---         profiles / projects / experiments / notebooks, public reads only
---         where visibility = 'public', curator roles for examples and
---         workspace_metadata, sensible read rules for tags and the join
---         tables.
---      3. Re-test with the anon and authenticated roles.
---    Until all of that is done, this file is a design artifact only.
---
---  HOW TO RUN
---    Supabase SQL editor, `supabase db reset`, or psql: run top-to-bottom.
---    Idempotent-friendly by design, so re-imports do not explode:
---      - tables:    create table if not exists
---      - indexes:   create index if not exists
---      - enums:     DO blocks that swallow duplicate_object
---      - triggers:  drop trigger if exists + create (PostgreSQL has no
---                   "create trigger if not exists")
---      - comments:  comment on ... simply overwrites
---
---  CONVENTIONS
---    - uuid primary keys, default gen_random_uuid() (pgcrypto; core in PG 13+)
---    - created_at / updated_at timestamptz not null default now()
---    - text for human fields, jsonb for configuration, snake_case names
---    - every foreign key states its ON DELETE behaviour explicitly
---    - assumed PostgreSQL 13+ (Supabase ships 15+)
+--  What this migration ADDS on top of the original schema.sql design:
+--    - profiles.role            (mirrors legacy User.role USER/ADMIN, lowercase)
+--    - public.permissions       (mirrors legacy granular Permission table)
+--    - public.presets           (NEW: user-made simulator presets)
+--    - handle_new_user()        (auto-provision profile on auth.users insert)
+--    - public.is_admin()        (SECURITY DEFINER helper used by RLS)
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
--- 0) Extensions and pg_catalog sanity
+-- 0) Extensions
 -- ---------------------------------------------------------------------------
-
--- pgcrypto provides gen_random_uuid() (on PostgreSQL 13+ the function is
--- core; the extension keeps this file compatible with older instances and
--- matches the standard Supabase template).
 create extension if not exists "pgcrypto";
 
--- Sanity: walk pg_catalog to confirm gen_random_uuid() is resolvable
--- (pg_catalog on PG 13+, or wherever pgcrypto was installed). Fails fast
--- with a readable message instead of a cascade of "function does not
--- exist" errors deep in the DDL. Read-only, safe to re-run.
+-- Fail fast (with a readable message) if gen_random_uuid() is unresolvable,
+-- instead of a cascade of "function does not exist" deep in the DDL.
 do $$
 begin
   if not exists (
@@ -86,12 +47,8 @@ end
 $$;
 
 -- ---------------------------------------------------------------------------
--- 1) Enum types
+-- 1) Enum types (verbatim from the original schema.sql design)
 -- ---------------------------------------------------------------------------
--- The DO blocks make re-imports idempotent: if the type already exists
--- (duplicate_object) we skip instead of erroring. NOTE: if an existing type
--- was created with different labels, this file does NOT migrate it.
-
 do $$
 begin
   create type public.visibility_type as enum ('public', 'private', 'unlisted');
@@ -127,19 +84,52 @@ end
 $$;
 
 -- ---------------------------------------------------------------------------
--- 2) auth.users shim (Supabase compatibility)
+-- 2) auth.* shims (Supabase compatibility)
 -- ---------------------------------------------------------------------------
--- profiles.id references auth.users, the user table managed by Supabase
--- Auth. On Supabase both statements below are no-ops (the schema and the
--- table already exist, so `if not exists` short-circuits). On a bare
--- PostgreSQL instance they create a minimal stand-in so that this file
--- still runs top-to-bottom for local review. Nothing in the landing page
--- ever reads this shim.
+-- On Supabase these are all no-ops (schema/table/function already exist). On
+-- bare PG they create minimal stand-ins so this file and migration 2 apply.
+--
+-- The shim auth.users carries email + raw_user_meta_data so handle_new_user()
+-- has the same columns to read from as real Supabase Auth.
+-- On hosted Supabase the `auth` schema/table already exist and are owned by a
+-- privileged role, so a plain `create ... if not exists` raises
+-- `permission denied for schema auth` (privilege is checked before existence).
+-- Wrap in a DO block that swallows insufficient_privilege: no-op on hosted,
+-- real shim on a bare PostgreSQL instance used for local review/tests.
+do $$
+begin
+  create schema if not exists auth;
+  create table if not exists auth.users (
+    id                 uuid primary key default gen_random_uuid(),
+    email              text,
+    raw_user_meta_data jsonb
+  );
+exception when insufficient_privilege then
+  null;
+end
+$$;
 
-create schema if not exists auth;
-create table if not exists auth.users (
-  id uuid primary key default gen_random_uuid()
-);
+-- auth.uid() is provided by Supabase. On bare PG it is missing, which would
+-- break creation of is_admin() and every RLS policy that references it. Create
+-- a null-returning stub ONLY when absent, so real Supabase is never clobbered.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'auth' and p.proname = 'uid'
+  ) then
+    execute $f$
+      create function auth.uid()
+      returns uuid
+      language sql
+      stable
+      as 'select null::uuid'
+    $f$;
+  end if;
+end
+$$;
 
 -- ---------------------------------------------------------------------------
 -- 3) Tables
@@ -152,11 +142,13 @@ create table if not exists public.profiles (
   display_name text        not null,
   avatar_url   text,
   bio          text,
+  role         text        not null default 'user',
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   constraint profiles_username_key unique (username),
   constraint profiles_username_format check (username ~ '^[a-z0-9_]{3,32}$'),
-  constraint profiles_bio_length check (bio is null or char_length(bio) <= 500)
+  constraint profiles_bio_length check (bio is null or char_length(bio) <= 500),
+  constraint profiles_role_check check (role in ('user', 'admin'))
 );
 
 comment on table public.profiles is
@@ -168,6 +160,8 @@ comment on column public.profiles.username is
 comment on column public.profiles.display_name is 'Human display name shown on the platform.';
 comment on column public.profiles.avatar_url is 'Optional avatar image URL.';
 comment on column public.profiles.bio is 'Optional short biography, hard limit of 500 characters.';
+comment on column public.profiles.role is
+  'Authorization role, mirrors the legacy custom auth (USER/ADMIN) as lowercase user/admin. admin bypasses ownership in RLS via public.is_admin().';
 comment on column public.profiles.updated_at is 'Auto-touched by the set_updated_at() trigger on every update.';
 
 -- 3.2 workspace_metadata -----------------------------------------------------
@@ -344,14 +338,65 @@ create table if not exists public.notebook_tags (
 comment on table public.notebook_tags is
   'Join table notebooks <-> tags. Rows disappear with either side (cascade from both).';
 
+-- 3.9 permissions (NEW) ------------------------------------------------------
+-- Mirrors the legacy custom-auth Permission table: granular capability keys
+-- for non-admin users. admin implicitly has all keys (enforced in app / RLS
+-- via public.is_admin()).
+create table if not exists public.permissions (
+  id         uuid        primary key default gen_random_uuid(),
+  user_id    uuid        not null references public.profiles(id) on delete cascade,
+  key        text        not null check (key in ('users:read','users:write','sessions:revoke','audit:read')),
+  granted_by uuid        references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  constraint permissions_user_key_unique unique (user_id, key)
+);
+
+create index if not exists permissions_user_id_idx on public.permissions(user_id);
+
+comment on table public.permissions is
+  'Granular capability grants for non-admin profiles (mirrors the legacy custom-auth Permission table). Admins hold every key implicitly via public.is_admin().';
+comment on column public.permissions.key is
+  'One of users:read | users:write | sessions:revoke | audit:read.';
+comment on column public.permissions.granted_by is
+  'Profile that granted this permission (audit); nulled if that profile is deleted.';
+
+-- 3.10 presets (NEW — core new feature) --------------------------------------
+create table if not exists public.presets (
+  id          uuid            primary key default gen_random_uuid(),
+  user_id     uuid            not null references public.profiles(id) on delete cascade,
+  workspace   workspace_type  not null,
+  name        text            not null,
+  description text,
+  config      jsonb           not null default '{}'::jsonb,
+  visibility  visibility_type not null default 'private',
+  created_at  timestamptz     not null default now(),
+  updated_at  timestamptz     not null default now(),
+  constraint presets_name_length check (char_length(name) between 1 and 120),
+  constraint presets_user_workspace_name_key unique (user_id, workspace, name)
+);
+
+create index if not exists presets_user_id_idx   on public.presets(user_id);
+create index if not exists presets_workspace_idx  on public.presets(workspace);
+create index if not exists presets_public_idx     on public.presets(visibility) where visibility = 'public';
+
+comment on table public.presets is
+  'User-made simulator presets: a saved, reusable workspace configuration. Owned by one profile; deleting the profile cascades.';
+comment on column public.presets.user_id is 'Owning profile (public.profiles.id). ON DELETE CASCADE.';
+comment on column public.presets.workspace is 'Workspace this preset applies to (one of the 9 workspace_type values).';
+comment on column public.presets.name is 'Preset name, non-empty and at most 120 characters. Unique per (user, workspace).';
+comment on column public.presets.config is
+  'Serialized simulator workspace state (same jsonb convention as experiments.configuration): data only, evaluated by the engine''s own lexer/parser/AST, never eval.';
+comment on column public.presets.visibility is
+  'public: shareable/listed. unlisted: reachable by direct link. private: owner only (default).';
+comment on column public.presets.updated_at is 'Auto-touched by the set_updated_at() trigger on every update.';
+
 -- ---------------------------------------------------------------------------
 -- 4) updated_at auto-touch
 -- ---------------------------------------------------------------------------
--- One shared trigger function bumps updated_at on every UPDATE. It is
--- attached to every table that HAS an updated_at column:
--- profiles, workspace_metadata, projects, experiments, notebooks, examples.
--- tags and the three join tables have no updated_at column, so they are
--- deliberately skipped.
+-- One shared trigger function bumps updated_at on every UPDATE. Attached to
+-- every table that HAS an updated_at column: profiles, workspace_metadata,
+-- projects, experiments, notebooks, examples, presets. tags, permissions and
+-- the three join tables have no updated_at column, so they are skipped.
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -363,8 +408,7 @@ begin
 end;
 $$;
 
--- PostgreSQL has no "create trigger if not exists", so the idempotent
--- pattern is drop-if-exists + create.
+-- PostgreSQL has no "create trigger if not exists", so drop-if-exists + create.
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
   before update on public.profiles
@@ -395,41 +439,94 @@ create trigger examples_set_updated_at
   before update on public.examples
   for each row execute function public.set_updated_at();
 
+drop trigger if exists presets_set_updated_at on public.presets;
+create trigger presets_set_updated_at
+  before update on public.presets
+  for each row execute function public.set_updated_at();
+
 -- ---------------------------------------------------------------------------
--- 5) FUTURE: Row Level Security
+-- 5) handle_new_user() — auto-provision a profile per auth user
 -- ---------------------------------------------------------------------------
--- EVERYTHING IN THIS SECTION IS INTENTIONALLY COMMENTED OUT so that this
--- file executes cleanly end-to-end. RLS is deliberately not enabled yet
--- (see the header): the landing runs on local data and nothing is exposed.
+-- Standard Supabase pattern: when a row lands in auth.users, insert the
+-- matching public.profiles row. SECURITY DEFINER so it can write through
+-- profiles RLS; pinned search_path to avoid hijacking. Defensive so it also
+-- runs against the bare-PG shim (which has email + raw_user_meta_data).
 --
--- TODO(owner): before going live you MUST uncomment the statements below
--- AND write the matching policies:
---   - profiles / projects / experiments / notebooks:
---       owner-only write (auth.uid() = user_id, or via the project chain),
---       public read only where visibility = 'public'.
---   - examples / workspace_metadata: read for everyone, writes limited to
---       a curator role / service role.
---   - tags and the join tables: public read, curator/service writes.
---
--- User-owned tables:
--- alter table public.profiles    enable row level security;
--- alter table public.projects    enable row level security;
--- alter table public.experiments enable row level security;
--- alter table public.notebooks   enable row level security;
---
--- Recommended for the platform/curator tables as well:
--- alter table public.workspace_metadata enable row level security;
--- alter table public.examples          enable row level security;
--- alter table public.tags              enable row level security;
--- alter table public.experiment_tags   enable row level security;
--- alter table public.project_tags      enable row level security;
--- alter table public.notebook_tags     enable row level security;
---
--- Verification once enabled:
--- select c.relname, c.relrowsecurity
--- from pg_catalog.pg_class c
--- join pg_catalog.pg_namespace n on n.oid = c.relnamespace
--- where n.nspname = 'public' and c.relkind = 'r';
+-- username is derived from metadata.username or the email local-part, then
+-- sanitized to the profiles_username_format constraint (^[a-z0-9_]{3,32}$).
+-- On the rare username collision the ON CONFLICT DO NOTHING swallows the
+-- insert (any unique constraint arbitrates) — the profile is simply not
+-- auto-created and can be provisioned explicitly. Acceptable for provisioning.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_meta     jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
+  v_email    text  := coalesce(new.email, '');
+  v_username text;
+  v_display  text;
+begin
+  v_display := coalesce(
+    nullif(v_meta->>'display_name', ''),
+    nullif(v_meta->>'full_name', ''),
+    nullif(v_meta->>'name', ''),
+    nullif(split_part(v_email, '@', 1), ''),
+    'user'
+  );
+
+  v_username := coalesce(
+    nullif(v_meta->>'username', ''),
+    nullif(split_part(v_email, '@', 1), ''),
+    'user'
+  );
+  v_username := regexp_replace(lower(v_username), '[^a-z0-9_]', '_', 'g');
+  if char_length(v_username) < 3 then
+    -- pad from the id so the 3-char minimum is always met
+    v_username := left(v_username || replace(new.id::text, '-', ''), 32);
+  end if;
+  v_username := left(v_username, 32);
+
+  insert into public.profiles (id, username, display_name)
+  values (new.id, v_username, v_display)
+  on conflict do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ---------------------------------------------------------------------------
+-- 6) is_admin() — RLS helper
+-- ---------------------------------------------------------------------------
+-- Returns true if the current auth user has profiles.role = 'admin'.
+-- SECURITY DEFINER so it reads profiles bypassing profiles-RLS (otherwise the
+-- admin clause of the profiles policies would recurse). STABLE + pinned
+-- search_path. Referenced by every write policy in migration 2.
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_catalog
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role = 'admin'
+  );
+$$;
+
+comment on function public.is_admin() is
+  'RLS helper: true when the current auth.uid() maps to a profile with role = admin. SECURITY DEFINER to avoid profiles-RLS recursion.';
+
 -- ============================================================================
---  End of schema.sql
+--  End of migration 1 — init_schema
 -- ============================================================================
