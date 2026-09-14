@@ -1,15 +1,30 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { Database } from "./types";
 
-/** Browser Supabase client (anon/publishable key). Env is read inside the
- *  factory so `next build` with no env configured does not crash at import. */
+let browserClient: ReturnType<typeof createBrowserClient<Database>> | null = null;
+
+/**
+ * Browser Supabase client (anon/publishable key).
+ * Lazy initialization: env vars are only validated when the client is first used,
+ * allowing `next build` to succeed without Supabase config for public pages.
+ */
 export function createClient() {
+  if (browserClient) return browserClient;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
   if (!url || !key) {
     throw new Error(
       "Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY (see .env.example)",
     );
   }
-  return createBrowserClient<Database>(url, key);
+
+  browserClient = createBrowserClient<Database>(url, key);
+  return browserClient;
+}
+
+/** Reset the cached client (for testing or config changes). */
+export function resetClient() {
+  browserClient = null;
 }

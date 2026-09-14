@@ -77,8 +77,12 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
       }
       onOpenChange(false);
       toast.success("Contraseña actualizada.");
-    } catch {
-      setError("Error de conexión. Inténtalo de nuevo.");
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Missing NEXT_PUBLIC_SUPABASE")) {
+        setError("Supabase no está configurado. Contacta al administrador.");
+      } else {
+        setError("Error de conexión. Inténtalo de nuevo.");
+      }
     } finally {
       setPending(false);
     }

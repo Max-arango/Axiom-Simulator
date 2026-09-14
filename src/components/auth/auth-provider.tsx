@@ -59,12 +59,29 @@ function translateAuthError(msg: string): string {
   return msg;
 }
 
+function getSupabaseClient() {
+  try {
+    return createClient();
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [supabase] = useState(() => createClient());
+  const [supabase] = useState<ReturnType<typeof createClient> | null>(() => getSupabaseClient());
   const [user, setUser] = useState<ClientUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!supabase) {
+      setConfigError("Supabase no configurado: faltan NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY");
+      setLoading(false);
+    }
+  }, [supabase]);
 
   const buildUser = useCallback(async (): Promise<ClientUser | null> => {
+    if (!supabase) return null;
     const {
       data: { user: authUser },
     } = await supabase.auth.getUser();
@@ -96,11 +113,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   const refresh = useCallback(async () => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
     setUser(await buildUser());
     setLoading(false);
-  }, [buildUser]);
+  }, [buildUser, supabase]);
 
   useEffect(() => {
+    if (!supabase) return;
     void refresh();
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
       void refresh();
@@ -110,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
+      if (!supabase) throw new AuthRequestError(500, "Supabase no configurado");
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new AuthRequestError(400, translateAuthError(error.message));
       const u = await buildUser();
@@ -122,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (email: string, name: string | undefined, password: string) => {
+      if (!supabase) throw new AuthRequestError(500, "Supabase no configurado");
       const username = (name || email.split("@")[0] || "user")
         .toLowerCase()
         .replace(/[^a-z0-9_]/g, "_")
@@ -146,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    if (!supabase) return;
     await supabase.auth.signOut();
     setUser(null);
   }, [supabase]);
