@@ -22,7 +22,9 @@ const other = (s: System): System => (s === "balanced" ? "unbalanced" : "balance
 export function Converter({ system }: { system: System }) {
   const [raw, setRaw] = useState("5");
   const n = Number(raw);
-  const valid = raw.trim() !== "" && Number.isInteger(n);
+  // isSafeInteger (not isInteger): rejects values like 1e21 that are "integers"
+  // but exceed float precision, which would make encode() loop on bad math.
+  const valid = raw.trim() !== "" && Number.isSafeInteger(n);
 
   const cur = valid ? encodeSafe(n, system) : undefined;
   const oth = valid ? encodeSafe(n, other(system)) : undefined;

@@ -18,7 +18,8 @@ import { TritCell, TritRow } from "./trit-cell";
 // works in the balanced system regardless of the lab's system toggle.
 function toBalanced(raw: string): { trits?: Trit[]; n?: number } {
   const n = Number(raw);
-  if (raw.trim() === "" || !Number.isInteger(n)) return {};
+  // isSafeInteger: reject out-of-precision "integers" (e.g. 1e21) that break encode.
+  if (raw.trim() === "" || !Number.isSafeInteger(n)) return {};
   return { trits: encode(n, "balanced").trits, n };
 }
 
