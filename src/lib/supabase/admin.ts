@@ -1,4 +1,4 @@
-// server-only — NEVER import from client code.
+import "server-only"; // build-time guard: any client-bundle import of this service-role module fails the build.
 import { createClient as createSbClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 import { ApiError } from "@/lib/admin/api";
