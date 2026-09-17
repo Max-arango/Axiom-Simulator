@@ -24,6 +24,7 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { id: "ws-calc", kind: "workspace", title: "Calculator", keywords: ["graph", "plot", "2d", "3d", "function", "derivative", "integral", "surface"], route: "calculator" },
   { id: "ws-fractal", kind: "workspace", title: "Fractal Lab", keywords: ["fractal", "mandelbrot", "julia", "chaos", "escape", "zoom"], route: "fractal" },
   { id: "ws-bloch", kind: "workspace", title: "Bloch Sphere", keywords: ["quantum", "qubit", "bloch", "gate", "pulse", "unitary", "spin"], route: "bloch" },
+  { id: "ws-quantum", kind: "workspace", title: "Quantum Lab", keywords: ["quantum", "qubit", "circuit", "gate", "hadamard", "cnot", "entanglement", "bell", "ghz", "measurement", "shots", "statevector", "grover", "teleportation", "composer"], route: "quantum" },
   { id: "ws-fourd", kind: "workspace", title: "4D", keywords: ["4d", "fourd", "polytope", "tesseract", "hypercube", "hoph", "clifford"], route: "fourd" },
   { id: "ws-topo", kind: "workspace", title: "Topology", keywords: ["topology", "homeomorphism", "genus", "euler characteristic", "manifold", "surface", "morph"], route: "topo" },
   { id: "ws-dynamics3d", kind: "workspace", title: "Dynamics 3D", keywords: ["dynamics 3d", "gravity", "n-body", "mathematical field", "general relativity", "schwarzschild", "kerr", "black hole", "geodesic", "frame dragging"], route: "dynamics3d" },

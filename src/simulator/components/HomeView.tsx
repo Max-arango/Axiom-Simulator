@@ -72,6 +72,21 @@ const WORKSPACES: Workspace[] = [
     ),
   },
   {
+    id: "quantum",
+    name: "Quantum Lab",
+    blurb: "Build & simulate qubit circuits.",
+    glyph: () => (
+      <G>
+        <line x1="12" y1="24" x2="52" y2="24" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+        <line x1="12" y1="40" x2="52" y2="40" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+        <rect x="20" y="18" width="12" height="12" stroke={V} strokeWidth="2.5" />
+        <circle cx="42" cy="24" r="3" fill={V} />
+        <line x1="42" y1="24" x2="42" y2="40" stroke={V} strokeWidth="2" />
+        <circle cx="42" cy="40" r="4.5" stroke={V} strokeWidth="2" />
+      </G>
+    ),
+  },
+  {
     id: "fourd",
     name: "4D Geometry",
     blurb: "Rotate tesseracts & polytopes.",

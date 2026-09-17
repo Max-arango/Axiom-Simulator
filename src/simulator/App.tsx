@@ -16,6 +16,7 @@ const DocsView = lazy(() => import("./components/docs/DocsView.tsx").then((m) =>
 const Dynamics3DView = lazy(() => import("./components/dynamics3d/Dynamics3DView.tsx").then((m) => ({ default: m.Dynamics3DView })));
 const InspectorView = lazy(() => import("./components/inspector/InspectorView.tsx").then((m) => ({ default: m.InspectorView })));
 const NotebookView = lazy(() => import("./components/notebook/NotebookView.tsx").then((m) => ({ default: m.NotebookView })));
+const QuantumLabView = lazy(() => import("./components/quantum/QuantumLabView.tsx").then((m) => ({ default: m.QuantumLabView })));
 
 /** Drives parameter animation; animTick no-ops (no set) while paused. */
 function useAnimDriver() {
@@ -93,6 +94,7 @@ function ModeNav() {
     { id: "calculator", label: "Calculator" },
     { id: "fractal", label: "Fractal Lab" },
     { id: "bloch", label: "Bloch Sphere" },
+    { id: "quantum", label: "Quantum Lab" },
     { id: "fourd", label: "4D" },
     { id: "topo", label: "Topology" },
     { id: "dynamics", label: "Dynamics" },
@@ -144,6 +146,10 @@ export function App() {
         <GraphView />
       ) : appMode === "bloch" ? (
         <BlochView />
+      ) : appMode === "quantum" ? (
+        <Suspense fallback={<div className="p-8 text-sm text-stone-500">Loading…</div>}>
+          <QuantumLabView />
+        </Suspense>
       ) : appMode === "fourd" ? (
         <FourDView />
       ) : appMode === "topo" ? (
