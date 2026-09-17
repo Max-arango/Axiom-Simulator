@@ -12,6 +12,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Converter } from "./converter";
 import { GateExplorer } from "./gate-explorer";
 import { ArithmeticTrace } from "./arithmetic-trace";
+import { CircuitEditor } from "./circuit/circuit-editor";
 
 export function TernaryLab() {
   // Shared across tabs. Switching system keeps the conceptual value; the
@@ -57,6 +58,7 @@ export function TernaryLab() {
           <TabsTrigger value="converter">Converter</TabsTrigger>
           <TabsTrigger value="gates">Gates</TabsTrigger>
           <TabsTrigger value="arithmetic">Arithmetic</TabsTrigger>
+          <TabsTrigger value="circuits">Circuits</TabsTrigger>
         </TabsList>
         <TabsContent value="converter">
           <Converter system={system} />
@@ -66,6 +68,9 @@ export function TernaryLab() {
         </TabsContent>
         <TabsContent value="arithmetic">
           <ArithmeticTrace />
+        </TabsContent>
+        <TabsContent value="circuits">
+          <CircuitEditor system={system} />
         </TabsContent>
       </Tabs>
     </main>
