@@ -67,6 +67,18 @@ export function Navbar() {
               </a>
             </li>
           ))}
+          <li>
+            <Link
+              href="/ternary"
+              data-cta="navbar-ternary"
+              className="focusable inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-graphite transition-colors hover:bg-secondary hover:text-ink"
+            >
+              Ternary Beta
+              <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-graphite">
+                Beta
+              </span>
+            </Link>
+          </li>
         </ul>
 
         <div className="flex items-center gap-2">
@@ -128,6 +140,19 @@ export function Navbar() {
               </a>
             </li>
           ))}
+          <li>
+            <Link
+              href="/ternary"
+              onClick={() => setOpen(false)}
+              data-cta="navbar-ternary"
+              className="focusable flex items-center gap-1.5 rounded-md px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-secondary"
+            >
+              Ternary Beta
+              <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-graphite">
+                Beta
+              </span>
+            </Link>
+          </li>
           <li className="flex items-center gap-2 pt-2">
             <Button asChild className="flex-1 font-semibold shadow-none">
               <Link
