@@ -167,3 +167,53 @@ describe("deterministic ids", () => {
     expect(s().placements.map((p) => p.id)).toEqual(first);
   });
 });
+
+describe("movePlacement (drag a gate)", () => {
+  const st = () => useQuantum.getState();
+
+  it("relocates a single-qubit gate to a new qubit + column", () => {
+    st().setNumQubits(3);
+    st().selectGate("H");
+    st().cellClick(0, 0);
+    const id = st().placements[0].id;
+    st().movePlacement(id, 0, 1, 2); // drag q0 → q1, column 2
+    const p = st().placements[0];
+    expect(p.qubits).toEqual([1]);
+    expect(p.column).toBe(2);
+    expect(st().error).toBeNull();
+  });
+
+  it("shifts a multi-qubit gate uniformly (control+target keep their offset)", () => {
+    st().setNumQubits(4);
+    st().selectGate("CX");
+    st().cellClick(0, 0); // control
+    st().cellClick(1, 0); // target → CX [0,1]@0
+    const id = st().placements[0].id;
+    st().movePlacement(id, 0, 2, 0); // drag its q0 down to q2
+    expect(st().placements[0].qubits).toEqual([2, 3]);
+    expect(st().placements[0].column).toBe(0);
+  });
+
+  it("rejects a move that collides with another gate", () => {
+    st().setNumQubits(2);
+    st().selectGate("H");
+    st().cellClick(0, 0); // H @ q0,c0
+    st().selectGate("X");
+    st().cellClick(1, 0); // X @ q1,c0
+    const xId = st().placements[1].id;
+    st().movePlacement(xId, 1, 0, 0); // drop X onto H's cell
+    expect(st().error).toMatch(/otra puerta/);
+    expect(st().placements[1].qubits).toEqual([1]); // unchanged
+  });
+
+  it("rejects a move that would leave the qubit range", () => {
+    st().setNumQubits(2);
+    st().selectGate("CX");
+    st().cellClick(0, 0);
+    st().cellClick(1, 0); // CX [0,1]@0
+    const id = st().placements[0].id;
+    st().movePlacement(id, 0, 1, 0); // dq=+1 → qubits [1,2], 2 is out of range
+    expect(st().error).toMatch(/rango/);
+    expect(st().placements[0].qubits).toEqual([0, 1]); // unchanged
+  });
+});

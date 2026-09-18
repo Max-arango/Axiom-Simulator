@@ -70,6 +70,8 @@ export interface QuantumState {
   selectPlacement: (id: string | null) => void;
   updatePlacementParams: (id: string, params: GateParams) => void;
   removePlacement: (id: string) => void;
+  /** Drag a placed gate: shift it so its `fromQubit` lands on (`toQubit`,`toColumn`). */
+  movePlacement: (id: string, fromQubit: number, toQubit: number, toColumn: number) => void;
   clearCircuit: () => void;
   loadCircuit: (circuit: Circuit) => void;
   reset: () => void;
@@ -198,6 +200,29 @@ export const useQuantum = create<QuantumState>((set, get) => ({
       placements: s.placements.filter((p) => p.id !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
     })),
+
+  movePlacement: (id, fromQubit, toQubit, toColumn) =>
+    set((s) => {
+      const p = s.placements.find((x) => x.id === id);
+      if (!p) return {};
+      const col = Math.max(0, Math.floor(toColumn));
+      const dq = Math.floor(toQubit) - Math.floor(fromQubit);
+      const dcol = col - p.column;
+      if (dq === 0 && dcol === 0) return {}; // dropped on itself → no change
+      const newQubits = p.qubits.map((q) => q + dq);
+      if (newQubits.some((q) => q < 0 || q >= s.numQubits)) {
+        return { error: "No cabe ahí: la puerta se saldría del rango de qubits." };
+      }
+      // any other placement occupying a target cell → collision
+      const clash = s.placements.some(
+        (o) => o.id !== id && o.column === col && o.qubits.some((q) => newQubits.includes(q)),
+      );
+      if (clash) return { error: "No cabe ahí: hay otra puerta en esa posición." };
+      return {
+        placements: s.placements.map((x) => (x.id === id ? { ...x, qubits: newQubits, column: col } : x)),
+        error: null,
+      };
+    }),
 
   clearCircuit: () => set({ placements: [], pending: null, selectedId: null, step: 0, shotResults: null }),
 

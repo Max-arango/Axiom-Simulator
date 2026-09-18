@@ -1,6 +1,11 @@
+import { useState } from "react";
 import { useQuantum, columnCount, placementAt, type PlacedOp } from "../../quantum/quantumStore.ts";
 import { getGateDoc } from "../../quantum/gateDocs.ts";
 import { cellRole, columnSpan, type CellRole } from "./gridCell.ts";
+
+// Payload carried by a drag: which op, grabbed from which qubit row.
+type DragData = { opId: string; fromQubit: number };
+const DRAG_MIME = "application/x-axiom-gate";
 
 // ponytail: row height is hardcoded to match Tailwind h-12 (48px) because the
 // vertical multi-qubit connector is absolutely positioned and needs pixel math.
@@ -17,6 +22,7 @@ export function CircuitGrid() {
   const step = useQuantum((s) => s.step);
   const cellClick = useQuantum((s) => s.cellClick);
   const selectPlacement = useQuantum((s) => s.selectPlacement);
+  const movePlacement = useQuantum((s) => s.movePlacement);
 
   const cols = Math.max(columnCount(placements) + 1, MIN_COLS);
   const rows = Array.from({ length: numQubits }, (_, i) => i);
@@ -27,6 +33,9 @@ export function CircuitGrid() {
     if (op) selectPlacement(op.id);
     cellClick(qubit, column);
   };
+
+  const onDropCell = (data: DragData, toQubit: number, toColumn: number) =>
+    movePlacement(data.opId, data.fromQubit, toQubit, toColumn);
 
   return (
     <div className="flex select-none font-mono text-sm text-ink">
@@ -52,6 +61,7 @@ export function CircuitGrid() {
               playhead={col === step}
               selectedId={selectedId}
               onCell={onCell}
+              onDropCell={onDropCell}
             />
           ))}
         </div>
@@ -68,6 +78,7 @@ function Column({
   playhead,
   selectedId,
   onCell,
+  onDropCell,
 }: {
   col: number;
   rows: number[];
@@ -76,6 +87,7 @@ function Column({
   playhead: boolean;
   selectedId: string | null;
   onCell: (qubit: number, column: number) => void;
+  onDropCell: (data: DragData, toQubit: number, toColumn: number) => void;
 }) {
   // multi-qubit ops in this column → vertical connectors between their extreme qubits
   const connectors = placements
@@ -103,7 +115,10 @@ function Column({
           role={cellRole(placements, q, col)}
           executed={executed}
           selectedId={selectedId}
+          qubit={q}
+          column={col}
           onClick={() => onCell(q, col)}
+          onDropCell={onDropCell}
         />
       ))}
     </div>
@@ -114,24 +129,63 @@ function Cell({
   role,
   executed,
   selectedId,
+  qubit,
+  column,
   onClick,
+  onDropCell,
 }: {
   role: CellRole;
   executed: boolean;
   selectedId: string | null;
+  qubit: number;
+  column: number;
   onClick: () => void;
+  onDropCell: (data: DragData, toQubit: number, toColumn: number) => void;
 }) {
   const opId = role.kind === "empty" ? null : role.op.id;
   const selected = opId !== null && opId === selectedId;
+  const draggable = opId !== null;
+  const [dropTarget, setDropTarget] = useState(false);
   const wire = executed ? "bg-vermilion-400/40" : "bg-line";
   const ring = selected ? "ring-2 ring-vermilion-400" : "";
+
+  const readDrag = (e: React.DragEvent): DragData | null => {
+    const raw = e.dataTransfer.getData(DRAG_MIME);
+    if (!raw) return null;
+    try {
+      const d = JSON.parse(raw);
+      return typeof d?.opId === "string" && Number.isInteger(d?.fromQubit) ? d : null;
+    } catch {
+      return null;
+    }
+  };
 
   return (
     <button
       onClick={onClick}
-      title={cellTitle(role)}
+      draggable={draggable}
+      onDragStart={(e) => {
+        if (opId === null) return;
+        e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ opId, fromQubit: qubit }));
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (!dropTarget) setDropTarget(true);
+      }}
+      onDragLeave={() => setDropTarget(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDropTarget(false);
+        const data = readDrag(e);
+        if (data) onDropCell(data, qubit, column);
+      }}
+      title={cellTitle(role) + (draggable ? " — arrastra para mover" : "")}
       aria-label={cellTitle(role)}
-      className="group relative flex h-12 w-14 items-center justify-center focusable"
+      className={`group relative flex h-12 w-14 items-center justify-center focusable ${
+        draggable ? "cursor-grab active:cursor-grabbing" : ""
+      } ${dropTarget ? "bg-vermilion-500/15 ring-1 ring-inset ring-vermilion-400/60" : ""}`}
     >
       {/* horizontal wire segment (cells abut → continuous wire) */}
       <span className={`pointer-events-none absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 ${wire}`} />
