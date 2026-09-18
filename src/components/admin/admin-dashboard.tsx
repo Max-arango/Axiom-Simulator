@@ -16,6 +16,7 @@ import {
   Activity,
   ChevronDown,
   Ellipsis,
+  FlaskConical,
   KeyRound,
   LoaderCircle,
   RefreshCw,
@@ -116,7 +117,10 @@ import {
   formatNumber,
   getErrorMessage,
   normalizeAttempts,
+  normalizeFlags,
   normalizeStats,
+  normalizeTernaryUser,
+  normalizeTernaryUsers,
   normalizeUser,
   normalizeUsers,
   userInitials,
@@ -124,12 +128,20 @@ import {
   type AdminStats,
   type AdminUser,
   type AttemptsPayload,
+  type FeatureFlag,
+  type FlagsMutationPayload,
+  type GrantInput,
   type LoginAttempt,
   type OkPayload,
   type OverviewPayload,
+  type TernaryPayload,
+  type TernaryStatus,
+  type TernaryUser,
+  type TernaryUserMutationPayload,
   type UserMutationPayload,
   type UsersPayload,
 } from "./admin-types";
+import { TernaryAccessPanel } from "./ternary-access-panel";
 
 type LoadStatus = "loading" | "ready" | "error";
 
@@ -165,11 +177,22 @@ export function AdminDashboard() {
     () => new Set<string>(),
   );
 
+  const [ternaryUsers, setTernaryUsers] = useState<TernaryUser[]>([]);
+  const [flags, setFlags] = useState<FeatureFlag[]>([]);
+  const [ternaryNote, setTernaryNote] = useState<string | null>(null);
+  const [pendingTernaryIds, setPendingTernaryIds] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+  const [pendingFlagKeys, setPendingFlagKeys] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+
   const loadAll = useCallback(async () => {
-    const [overview, usersResult, attemptsResult] = await Promise.allSettled([
+    const [overview, usersResult, attemptsResult, ternaryResult] = await Promise.allSettled([
       apiFetch<OverviewPayload>("/api/admin/overview"),
       apiFetch<UsersPayload>("/api/admin/users"),
       apiFetch<AttemptsPayload>("/api/admin/login-attempts?limit=50"),
+      apiFetch<TernaryPayload>("/api/admin/ternary"),
     ]);
 
     if (overview.status === "fulfilled" && usersResult.status === "fulfilled") {
@@ -190,6 +213,21 @@ export function AdminDashboard() {
           getErrorMessage(attemptsResult.reason, "No se pudo cargar el registro de intentos de acceso."),
         );
       }
+
+      // Ternary Beta is a secondary concern: a failure here must not block the
+      // rest of the dashboard, only surface a note in its own tab.
+      if (ternaryResult.status === "fulfilled") {
+        setTernaryUsers(normalizeTernaryUsers(ternaryResult.value.users));
+        setFlags(normalizeFlags(ternaryResult.value.flags));
+        setTernaryNote(null);
+      } else {
+        setTernaryUsers([]);
+        setFlags([]);
+        setTernaryNote(
+          getErrorMessage(ternaryResult.reason, "No se pudo cargar el acceso a Ternary Beta."),
+        );
+      }
+
       setLoadError(null);
       setStatus("ready");
       return;
@@ -374,6 +412,95 @@ export function AdminDashboard() {
     }
   }, [deleteTarget, refreshStats]);
 
+  /* --- Ternary Beta: acceso por usuario y feature flags ------------------ */
+
+  const replaceTernaryUser = useCallback((updated: TernaryUser) => {
+    setTernaryUsers((prev) => prev.map((user) => (user.id === updated.id ? updated : user)));
+  }, []);
+
+  const mutateTernaryUser = useCallback(
+    async (userId: string, path: string, body: Record<string, unknown>, fallback: string) => {
+      setPendingTernaryIds((prev) => new Set(prev).add(userId));
+      try {
+        const data = await apiFetch<TernaryUserMutationPayload>(path, {
+          method: path.endsWith("/status") ? "PATCH" : "POST",
+          body: JSON.stringify(body),
+        });
+        const user = normalizeTernaryUser(data.user);
+        if (user === null) {
+          throw new ApiError(500, "La respuesta del servidor no tiene el formato esperado.");
+        }
+        replaceTernaryUser(user);
+      } catch (error) {
+        toast.error(getErrorMessage(error, fallback));
+      } finally {
+        setPendingTernaryIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      }
+    },
+    [replaceTernaryUser],
+  );
+
+  const handleGrant = useCallback(
+    (userId: string, input: GrantInput) => {
+      void mutateTernaryUser(
+        userId,
+        "/api/admin/ternary/grant",
+        { userId, ...input },
+        "No se pudo otorgar el acceso.",
+      );
+    },
+    [mutateTernaryUser],
+  );
+
+  const handleRevoke = useCallback(
+    (userId: string) => {
+      void mutateTernaryUser(
+        userId,
+        "/api/admin/ternary/revoke",
+        { userId },
+        "No se pudo revocar el acceso.",
+      );
+    },
+    [mutateTernaryUser],
+  );
+
+  const handleStatus = useCallback(
+    (userId: string, nextStatus: TernaryStatus) => {
+      void mutateTernaryUser(
+        userId,
+        "/api/admin/ternary/status",
+        { userId, status: nextStatus },
+        "No se pudo cambiar el estado del acceso.",
+      );
+    },
+    [mutateTernaryUser],
+  );
+
+  const handleFlag = useCallback((key: string, enabled: boolean) => {
+    setPendingFlagKeys((prev) => new Set(prev).add(key));
+    void apiFetch<FlagsMutationPayload>("/api/admin/ternary/flags", {
+      method: "PATCH",
+      body: JSON.stringify({ key, enabled }),
+    })
+      .then((data) => {
+        setFlags(normalizeFlags(data.flags));
+      })
+      .catch((error: unknown) => {
+        toast.error(getErrorMessage(error, "No se pudo actualizar el feature flag."));
+      })
+      .finally(() => {
+        setPendingFlagKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      });
+  }, []);
+
   return (
     <section
       aria-labelledby="admin-dashboard-title"
@@ -438,6 +565,9 @@ export function AdminDashboard() {
               <TabsTrigger value="seguridad" className="px-4">
                 <ShieldCheck aria-hidden="true" /> Seguridad
               </TabsTrigger>
+              <TabsTrigger value="ternary" className="px-4">
+                <FlaskConical aria-hidden="true" /> Ternary Beta
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="usuarios" className="mt-4">
@@ -460,6 +590,26 @@ export function AdminDashboard() {
                 note={attemptsNote}
                 isRefreshing={isRefreshingAttempts}
                 onRefresh={() => void handleRefreshAttempts()}
+              />
+            </TabsContent>
+
+            <TabsContent value="ternary" className="mt-4">
+              {ternaryNote !== null ? (
+                <Alert variant="destructive" className="mb-4">
+                  <TriangleAlert aria-hidden="true" />
+                  <AlertTitle>No se pudo cargar Ternary Beta</AlertTitle>
+                  <AlertDescription>{ternaryNote}</AlertDescription>
+                </Alert>
+              ) : null}
+              <TernaryAccessPanel
+                users={ternaryUsers}
+                flags={flags}
+                onGrant={handleGrant}
+                onRevoke={handleRevoke}
+                onStatus={handleStatus}
+                onFlag={handleFlag}
+                pendingUserIds={pendingTernaryIds}
+                pendingFlagKeys={pendingFlagKeys}
               />
             </TabsContent>
           </Tabs>

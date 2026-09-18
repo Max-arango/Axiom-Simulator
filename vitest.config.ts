@@ -18,7 +18,9 @@ export default defineConfig({
     include: [
       "src/simulator/**/*.test.ts",
       "src/lib/ternary/**/*.test.ts",
+      "src/lib/admin/**/*.test.ts",
       "src/components/ternary/**/*.test.tsx",
+      "src/components/admin/**/*.test.tsx",
     ],
     environment: "node",
   },
