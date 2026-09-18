@@ -10,7 +10,6 @@ import { InspectorSection } from "@/components/landing/inspector-section";
 import { NotebookSection } from "@/components/landing/notebook-section";
 import { OpenSourceSection } from "@/components/landing/open-source-section";
 import { WhySection } from "@/components/landing/why-section";
-import { AdminSection } from "@/components/admin/admin-section";
 import { FinalCta } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
 
@@ -41,7 +40,6 @@ export default function Home() {
         <NotebookSection />
         <OpenSourceSection />
         <WhySection />
-        <AdminSection />
         <FinalCta />
       </main>
       <Footer />

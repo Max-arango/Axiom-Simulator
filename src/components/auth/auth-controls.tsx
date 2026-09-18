@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { KeyRound, LoaderCircle, LogIn, LogOut, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -112,10 +113,10 @@ export function AuthControls() {
           <DropdownMenuSeparator />
           {user.role === "ADMIN" ? (
             <DropdownMenuItem asChild>
-              <a href="#admin">
+              <Link href="/admin">
                 <ShieldCheck aria-hidden="true" />
                 Panel de administración
-              </a>
+              </Link>
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuItem onSelect={() => setPwOpen(true)}>
