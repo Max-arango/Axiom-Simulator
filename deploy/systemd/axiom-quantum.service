@@ -1,0 +1,14 @@
+[Unit]
+Description=AXIOM Quantum Lab (Next.js standalone server)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fellcrack/Trabajo/Personal/proyects/Mathematics/Mathematics-landing
+Environment=NODE_ENV=production
+ExecStart=/home/fellcrack/.bun/bin/bun .next/standalone/server.js
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

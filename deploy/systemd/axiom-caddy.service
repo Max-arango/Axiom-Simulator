@@ -1,0 +1,13 @@
+[Unit]
+Description=AXIOM Caddy reverse proxy (:8081 -> :3000)
+After=network.target axiom-quantum.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fellcrack/Trabajo/Personal/proyects/Mathematics/Mathematics-landing
+ExecStart=/home/fellcrack/.local/bin/caddy run --config Caddyfile --adapter caddyfile
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target
