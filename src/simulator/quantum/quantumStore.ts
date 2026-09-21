@@ -20,7 +20,10 @@ import { GATES } from "./gates.ts";
 import { applyOperation, zeroState } from "./statevector.ts";
 import { runCircuit } from "./simulator.ts";
 import { sampleShots } from "./measurement.ts";
+import { runTrajectory, runShotsTrajectory, isStochastic } from "./trajectory.ts";
 import { validate } from "./circuit.ts";
+import { BUILTIN_COMPOSITES, expandComposite, type CompositeDef } from "./composites.ts";
+import { NO_NOISE, type NoiseConfig } from "./noise.ts";
 import {
   MAX_QUBITS,
   type Circuit,
@@ -36,6 +39,9 @@ export interface PlacedOp {
   gate: GateId;
   qubits: number[];
   params?: GateParams;
+  openControls?: number[]; // control qubit indices that fire on |0⟩ (anti-controls)
+  clbit?: number; // for M: classical bit to write (defaults to the measured qubit)
+  condition?: { clbit: number; value: 0 | 1 }; // c_if: apply only if clbit === value
   column: number;
 }
 
@@ -61,10 +67,14 @@ export interface QuantumState {
   seed: number;
   shotResults: Record<string, number> | null;
   error: string | null;
+  past: HistorySnapshot[];
+  future: HistorySnapshot[];
+  composites: CompositeDef[];
+  noise: NoiseConfig;
 
   setNumQubits: (n: number) => void;
   selectGate: (id: GateId | null) => void;
-  setDraftParam: (key: "theta" | "phi", value: number) => void;
+  setDraftParam: (key: "theta" | "phi" | "lambda", value: number) => void;
   cellClick: (qubit: number, column: number) => void;
   cancelPending: () => void;
   selectPlacement: (id: string | null) => void;
@@ -86,23 +96,52 @@ export interface QuantumState {
   setShots: (n: number) => void;
   runShots: () => void;
   setSeed: (n: number) => void;
+  undo: () => void;
+  redo: () => void;
+  setOpenControls: (id: string, openControls: number[]) => void;
+  /** Set (or clear with null) a classical conditional (c_if) on a placed gate. */
+  setCondition: (id: string, condition: { clbit: number; value: 0 | 1 } | null) => void;
+  /** Set the classical-bit target of a measurement op. */
+  setClbit: (id: string, clbit: number) => void;
+  /** Save the current circuit as a reusable composite gate. */
+  saveComposite: (name: string) => void;
+  /** Stamp a composite's expanded ops onto the circuit starting at `baseQubit`. */
+  insertComposite: (id: string, baseQubit: number) => void;
+  deleteComposite: (id: string) => void;
+  /** Update the Monte-Carlo noise model (applied only to shots). */
+  setNoise: (patch: Partial<NoiseConfig>) => void;
 }
 
+/** Undo/redo entry: only the circuit-defining fields we restore. */
+export type HistorySnapshot = Pick<QuantumState, "numQubits" | "placements" | "nextId">;
+
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+
+const snap = (s: QuantumState): HistorySnapshot => ({
+  numQubits: s.numQubits,
+  placements: s.placements,
+  nextId: s.nextId,
+});
+
+/** Patch that records the current circuit into `past` (cap 100) and clears redo. */
+const pushHistory = (s: QuantumState): Pick<QuantumState, "past" | "future"> => ({
+  past: [...s.past.slice(-99), snap(s)],
+  future: [],
+});
 
 /** Fresh default data fields (excludes actions). Exported so tests can reset. */
 export function makeInitialState(): Pick<
   QuantumState,
   | "numQubits" | "placements" | "nextId" | "selectedGate" | "draftParams"
   | "pending" | "selectedId" | "step" | "playing" | "selectedQubit"
-  | "shots" | "seed" | "shotResults" | "error"
+  | "shots" | "seed" | "shotResults" | "error" | "past" | "future"
 > {
   return {
     numQubits: 3,
     placements: [],
     nextId: 1,
     selectedGate: "H",
-    draftParams: { theta: Math.PI / 2, phi: Math.PI / 2 },
+    draftParams: { theta: Math.PI / 2, phi: Math.PI / 2, lambda: Math.PI / 2 },
     pending: null,
     selectedId: null,
     step: 0,
@@ -112,6 +151,8 @@ export function makeInitialState(): Pick<
     seed: 12345,
     shotResults: null,
     error: null,
+    past: [],
+    future: [],
   };
 }
 
@@ -126,13 +167,15 @@ function paramsFor(gate: GateId, draft: GateParams): GateParams | undefined {
 
 export const useQuantum = create<QuantumState>((set, get) => ({
   ...makeInitialState(),
+  composites: BUILTIN_COMPOSITES, // library persists across reset() (not in makeInitialState)
+  noise: NO_NOISE, // noise setting persists across reset()
 
   setNumQubits: (n) =>
     set((s) => {
       const num = clamp(Math.floor(n), 1, MAX_QUBITS);
       const placements = s.placements.filter((p) => p.qubits.every((q) => q < num));
       const pending = s.pending && s.pending.qubits.every((q) => q < num) ? s.pending : null;
-      return { numQubits: num, placements, pending, selectedQubit: clamp(s.selectedQubit, 0, num - 1), step: 0 };
+      return { ...pushHistory(s), numQubits: num, placements, pending, selectedQubit: clamp(s.selectedQubit, 0, num - 1), step: 0 };
     }),
 
   selectGate: (id) => set({ selectedGate: id, pending: null }),
@@ -155,7 +198,7 @@ export const useQuantum = create<QuantumState>((set, get) => ({
       const params = paramsFor(gate, s.draftParams);
       const placement: PlacedOp = { id: `op-${s.nextId}`, gate, qubits: [qubit], column };
       if (params) placement.params = params;
-      set({ placements: [...s.placements, placement], nextId: s.nextId + 1, error: null });
+      set({ ...pushHistory(s), placements: [...s.placements, placement], nextId: s.nextId + 1, error: null });
       return;
     }
 
@@ -180,7 +223,7 @@ export const useQuantum = create<QuantumState>((set, get) => ({
       const params = paramsFor(gate, s.draftParams);
       const placement: PlacedOp = { id: `op-${s.nextId}`, gate, qubits, column };
       if (params) placement.params = params;
-      set({ placements: [...s.placements, placement], nextId: s.nextId + 1, pending: null, error: null });
+      set({ ...pushHistory(s), placements: [...s.placements, placement], nextId: s.nextId + 1, pending: null, error: null });
     } else {
       set({ pending: { gate, column, qubits }, error: null });
     }
@@ -191,15 +234,23 @@ export const useQuantum = create<QuantumState>((set, get) => ({
   selectPlacement: (id) => set({ selectedId: id }),
 
   updatePlacementParams: (id, params) =>
-    set((s) => ({
-      placements: s.placements.map((p) => (p.id === id ? { ...p, params: { ...p.params, ...params } } : p)),
-    })),
+    set((s) => {
+      if (!s.placements.some((p) => p.id === id)) return {};
+      return {
+        ...pushHistory(s),
+        placements: s.placements.map((p) => (p.id === id ? { ...p, params: { ...p.params, ...params } } : p)),
+      };
+    }),
 
   removePlacement: (id) =>
-    set((s) => ({
-      placements: s.placements.filter((p) => p.id !== id),
-      selectedId: s.selectedId === id ? null : s.selectedId,
-    })),
+    set((s) => {
+      if (!s.placements.some((p) => p.id === id)) return {};
+      return {
+        ...pushHistory(s),
+        placements: s.placements.filter((p) => p.id !== id),
+        selectedId: s.selectedId === id ? null : s.selectedId,
+      };
+    }),
 
   movePlacement: (id, fromQubit, toQubit, toColumn) =>
     set((s) => {
@@ -219,12 +270,14 @@ export const useQuantum = create<QuantumState>((set, get) => ({
       );
       if (clash) return { error: "No cabe ahí: hay otra puerta en esa posición." };
       return {
+        ...pushHistory(s),
         placements: s.placements.map((x) => (x.id === id ? { ...x, qubits: newQubits, column: col } : x)),
         error: null,
       };
     }),
 
-  clearCircuit: () => set({ placements: [], pending: null, selectedId: null, step: 0, shotResults: null }),
+  clearCircuit: () =>
+    set((s) => ({ ...pushHistory(s), placements: [], pending: null, selectedId: null, step: 0, shotResults: null })),
 
   loadCircuit: (circuit) =>
     set((s) => {
@@ -240,10 +293,12 @@ export const useQuantum = create<QuantumState>((set, get) => ({
         for (const q of op.qubits) if (q >= 0 && q < num) lastUsed[q] = col;
         const placement: PlacedOp = { id: `op-${id}`, gate: op.gate, qubits: [...op.qubits], column: col };
         if (op.params) placement.params = { ...op.params };
+        if (op.openControls && op.openControls.length) placement.openControls = [...op.openControls];
         placements.push(placement);
         id++;
       }
       return {
+        ...pushHistory(s),
         numQubits: num,
         placements,
         nextId: id,
@@ -273,11 +328,134 @@ export const useQuantum = create<QuantumState>((set, get) => ({
 
   runShots: () =>
     set((s) => {
-      const state = runCircuit(toCircuit(s));
+      const circuit = toCircuit(s);
+      // Trajectory path when there's mid-circuit measurement / feed-forward OR noise
+      // is enabled; otherwise the fast exact end-measurement of the ideal state.
+      if (isStochastic(circuit.ops) || s.noise.enabled) {
+        return { shotResults: runShotsTrajectory(circuit, s.shots, makeRng(s.seed), s.noise) };
+      }
+      const state = runCircuit(circuit);
       return { shotResults: sampleShots(state, s.numQubits, s.shots, makeRng(s.seed)) };
     }),
 
   setSeed: (n) => set({ seed: n }),
+
+  setNoise: (patch) => set((s) => ({ noise: { ...s.noise, ...patch } })),
+
+  undo: () =>
+    set((s) => {
+      if (s.past.length === 0) return {};
+      const prev = s.past[s.past.length - 1];
+      const selectedId = prev.placements.some((p) => p.id === s.selectedId) ? s.selectedId : null;
+      return {
+        numQubits: prev.numQubits,
+        placements: prev.placements,
+        nextId: prev.nextId,
+        past: s.past.slice(0, -1),
+        future: [snap(s), ...s.future],
+        step: clamp(s.step, 0, columnCount(prev.placements)),
+        pending: null,
+        error: null,
+        selectedId,
+      };
+    }),
+
+  redo: () =>
+    set((s) => {
+      if (s.future.length === 0) return {};
+      const next = s.future[0];
+      const selectedId = next.placements.some((p) => p.id === s.selectedId) ? s.selectedId : null;
+      return {
+        numQubits: next.numQubits,
+        placements: next.placements,
+        nextId: next.nextId,
+        past: [...s.past.slice(-99), snap(s)],
+        future: s.future.slice(1),
+        step: clamp(s.step, 0, columnCount(next.placements)),
+        pending: null,
+        error: null,
+        selectedId,
+      };
+    }),
+
+  setOpenControls: (id, openControls) =>
+    set((s) => {
+      const p = s.placements.find((x) => x.id === id);
+      if (!p) return {};
+      // Anti-controls only make sense on control qubits; targets are excluded.
+      const controls = GATES[p.gate].kind === "controlled" ? p.qubits.slice(0, -1) : [];
+      const filtered = [...new Set(openControls)].filter((q) => controls.includes(q));
+      return {
+        ...pushHistory(s),
+        placements: s.placements.map((x) => (x.id === id ? { ...x, openControls: filtered } : x)),
+      };
+    }),
+
+  setCondition: (id, condition) =>
+    set((s) => {
+      const p = s.placements.find((x) => x.id === id);
+      if (!p) return {};
+      const cond =
+        condition && Number.isInteger(condition.clbit) && condition.clbit >= 0 && condition.clbit < s.numQubits
+          ? { clbit: condition.clbit, value: condition.value }
+          : undefined;
+      return {
+        ...pushHistory(s),
+        placements: s.placements.map((x) => (x.id === id ? { ...x, condition: cond } : x)),
+      };
+    }),
+
+  setClbit: (id, clbit) =>
+    set((s) => {
+      const p = s.placements.find((x) => x.id === id);
+      if (!p || !Number.isInteger(clbit) || clbit < 0 || clbit >= s.numQubits) return {};
+      return {
+        ...pushHistory(s),
+        placements: s.placements.map((x) => (x.id === id ? { ...x, clbit } : x)),
+      };
+    }),
+
+  saveComposite: (name) =>
+    set((s) => {
+      const trimmed = name.trim();
+      if (!trimmed || s.placements.length === 0) {
+        return { error: "Nombra la compuerta y ten un circuito no vacío para guardarla." };
+      }
+      const def: CompositeDef = { id: `c-${s.nextId}`, name: trimmed, qubits: s.numQubits, ops: toCircuit(s).ops };
+      return { composites: [...s.composites, def], nextId: s.nextId + 1, error: null };
+    }),
+
+  insertComposite: (id, baseQubit) =>
+    set((s) => {
+      const def = s.composites.find((c) => c.id === id);
+      if (!def) return {};
+      const base = Math.max(0, Math.floor(baseQubit));
+      if (base + def.qubits > s.numQubits) {
+        return { error: `${def.name} necesita ${def.qubits} qubits desde q${base}; no caben en ${s.numQubits}.` };
+      }
+      const expanded = expandComposite(def, base);
+      // ASAP-schedule the expanded ops, appended after the current circuit
+      const lastUsed = new Array(s.numQubits).fill(-1);
+      for (const p of s.placements) for (const q of p.qubits) if (p.column > lastUsed[q]) lastUsed[q] = p.column;
+      const added: PlacedOp[] = [];
+      let nid = s.nextId;
+      for (const op of expanded) {
+        let col = 0;
+        for (const q of op.qubits) if (lastUsed[q] + 1 > col) col = lastUsed[q] + 1;
+        for (const q of op.qubits) lastUsed[q] = col;
+        const placement: PlacedOp = { id: `op-${nid}`, gate: op.gate, qubits: [...op.qubits], column: col };
+        if (op.params) placement.params = { ...op.params };
+        if (op.openControls && op.openControls.length) placement.openControls = [...op.openControls];
+        if (op.clbit !== undefined) placement.clbit = op.clbit;
+        if (op.condition) placement.condition = { ...op.condition };
+        added.push(placement);
+        nid++;
+      }
+      return { ...pushHistory(s), placements: [...s.placements, ...added], nextId: nid, error: null };
+    }),
+
+  deleteComposite: (id) =>
+    set((s) => ({ composites: s.composites.filter((c) => c.id !== id || c.builtin === true) })),
 }));
 
 // --- exported pure selectors/helpers (plain functions, NOT hooks) ---
@@ -288,9 +466,12 @@ export function toCircuit(s: { numQubits: number; placements: PlacedOp[] }): Cir
   const ops: Operation[] = sorted.map((p) => {
     const op: Operation = { gate: p.gate, qubits: [...p.qubits] };
     if (p.params) op.params = { ...p.params };
+    if (p.openControls && p.openControls.length) op.openControls = [...p.openControls];
+    if (p.clbit !== undefined) op.clbit = p.clbit;
+    if (p.condition) op.condition = { ...p.condition };
     return op;
   });
-  return { qubits: s.numQubits, ops };
+  return { qubits: s.numQubits, clbits: s.numQubits, ops };
 }
 
 /** Number of grid columns = max column + 1 (0 if empty). */
@@ -313,8 +494,23 @@ export function stateAfterColumn(numQubits: number, placements: PlacedOp[], col:
 }
 
 /** State at the store's current step. */
-export function currentState(s: { numQubits: number; placements: PlacedOp[]; step: number }): StateVector {
-  return stateAfterColumn(s.numQubits, s.placements, s.step);
+/** Fixed seed for the single trajectory shown in the step-by-step panels, so all
+ * panels display the SAME run. Override via `seed` to re-roll. */
+const VIEW_SEED = 20260918;
+
+export function currentState(s: { numQubits: number; placements: PlacedOp[]; step: number; seed?: number }): StateVector {
+  // ops up to the current column (exclusive), in execution order
+  const partial = [...s.placements].filter((p) => p.column < s.step).sort((a, b) => a.column - b.column);
+  const ops: Operation[] = partial.map((p) => {
+    const op: Operation = { gate: p.gate, qubits: [...p.qubits] };
+    if (p.params) op.params = { ...p.params };
+    if (p.openControls && p.openControls.length) op.openControls = [...p.openControls];
+    if (p.clbit !== undefined) op.clbit = p.clbit;
+    if (p.condition) op.condition = { ...p.condition };
+    return op;
+  });
+  if (!isStochastic(ops)) return stateAfterColumn(s.numQubits, s.placements, s.step); // pure fast path
+  return runTrajectory({ qubits: s.numQubits, clbits: s.numQubits, ops }, makeRng(s.seed ?? VIEW_SEED)).state;
 }
 
 /** The placement covering (qubit, column), if any. */

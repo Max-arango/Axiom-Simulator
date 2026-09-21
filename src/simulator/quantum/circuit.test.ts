@@ -52,9 +52,9 @@ describe("validate rejects with friendly messages", () => {
     expect(r.ok).toBe(false);
     expect(r.errors).toContain("RX requires a θ parameter.");
   });
-  it("qubit count 0 or 7", () => {
-    expect(validate({ qubits: 0, ops: [] }).errors).toContain("Circuit must have 1–6 qubits.");
-    expect(validate({ qubits: 7, ops: [] }).errors).toContain("Circuit must have 1–6 qubits.");
+  it("qubit count 0 or 9", () => {
+    expect(validate({ qubits: 0, ops: [] }).errors).toContain("Circuit must have 1–8 qubits.");
+    expect(validate({ qubits: 9, ops: [] }).errors).toContain("Circuit must have 1–8 qubits.");
   });
   it("collects every error, not just the first", () => {
     const r = validate({ qubits: 0, ops: [{ gate: "CX", qubits: [1, 1] }] });

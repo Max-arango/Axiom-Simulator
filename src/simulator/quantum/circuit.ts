@@ -40,8 +40,9 @@ function distinctMessage(id: GateId): string {
   return DISTINCT_MSG[id] ?? `${id} requires distinct qubits.`;
 }
 
-function paramMessage(id: GateId, param: "theta" | "phi"): string {
-  return `${id} requires a ${param === "theta" ? "θ" : "φ"} parameter.`;
+function paramMessage(id: GateId, param: "theta" | "phi" | "lambda"): string {
+  const sym = param === "theta" ? "θ" : param === "phi" ? "φ" : "λ";
+  return `${id} requires a ${sym} parameter.`;
 }
 
 /**
@@ -52,7 +53,7 @@ export function validate(circuit: Circuit): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   const n = circuit.qubits;
   const validN = Number.isInteger(n) && n >= 1 && n <= MAX_QUBITS;
-  if (!validN) errors.push("Circuit must have 1–6 qubits.");
+  if (!validN) errors.push(`Circuit must have 1–${MAX_QUBITS} qubits.`);
 
   const ops = Array.isArray(circuit.ops) ? circuit.ops : [];
   for (const op of ops) {

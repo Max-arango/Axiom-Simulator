@@ -19,6 +19,15 @@ import { GateInspector } from "./GateInspector.tsx";
 import { LearnPanel } from "./LearnPanel.tsx";
 import { GatePalette } from "./GatePalette.tsx";
 import { CircuitGrid } from "./CircuitGrid.tsx";
+import { QSpherePanel } from "./QSpherePanel.tsx";
+import { QasmPanel } from "./QasmPanel.tsx";
+import { ObservablesPanel } from "./ObservablesPanel.tsx";
+import { CorrelationPanel } from "./CorrelationPanel.tsx";
+import { PhaseDiskPanel } from "./PhaseDiskPanel.tsx";
+import { MetricsBar } from "./MetricsBar.tsx";
+import { SavedCircuitsPanel } from "./SavedCircuitsPanel.tsx";
+import { CompositesPanel } from "./CompositesPanel.tsx";
+import { NoisePanel } from "./NoisePanel.tsx";
 
 describe("Quantum Lab render smoke", () => {
   it("renders the full view without throwing", () => {
@@ -37,7 +46,7 @@ describe("Quantum Lab render smoke", () => {
     useQuantum.getState().runShots();
     const first = useQuantum.getState().placements[0];
     if (first) useQuantum.getState().selectPlacement(first.id);
-    for (const C of [StatePanel, MeasurementPanel, BlochPanel, EntanglementPanel, GateInspector, LearnPanel, GatePalette, CircuitGrid]) {
+    for (const C of [StatePanel, MeasurementPanel, BlochPanel, EntanglementPanel, GateInspector, LearnPanel, GatePalette, CircuitGrid, QSpherePanel, QasmPanel, ObservablesPanel, CorrelationPanel, PhaseDiskPanel, MetricsBar, SavedCircuitsPanel, CompositesPanel, NoisePanel]) {
       const html = renderToStaticMarkup(createElement(C));
       expect(html.length).toBeGreaterThan(0);
     }

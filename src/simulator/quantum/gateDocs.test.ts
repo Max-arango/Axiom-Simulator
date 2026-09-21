@@ -3,7 +3,7 @@ import { GATES } from "./gates.ts";
 import { GATE_DOCS, getGateDoc } from "./gateDocs.ts";
 import type { GateId } from "./types.ts";
 
-const PARAMETRIC: GateId[] = ["RX", "RY", "RZ", "PHASE"];
+const PARAMETRIC: GateId[] = ["RX", "RY", "RZ", "PHASE", "U3", "CP", "CRX", "CRY", "CRZ", "RXX", "RYY", "RZZ"];
 
 describe("gateDocs — coverage", () => {
   it("has a doc with non-empty name and summary for every GateId", () => {

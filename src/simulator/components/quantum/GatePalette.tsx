@@ -4,14 +4,16 @@ import { getGateDoc } from "../../quantum/gateDocs.ts";
 import type { GateId } from "../../quantum/types.ts";
 
 const GROUPS: { title: string; ids: GateId[] }[] = [
-  { title: "Simples", ids: ["I", "X", "Y", "Z", "H", "S", "Sdg", "T", "Tdg"] },
-  { title: "Paramétricas", ids: ["RX", "RY", "RZ", "PHASE"] },
-  { title: "Multi-qubit", ids: ["CX", "CZ", "SWAP", "CCX"] },
-  { title: "Medición", ids: ["M"] },
+  { title: "Simples", ids: ["I", "X", "Y", "Z", "H", "S", "Sdg", "T", "Tdg", "SX", "SXdg"] },
+  { title: "Paramétricas", ids: ["RX", "RY", "RZ", "PHASE", "U3"] },
+  { title: "Controladas", ids: ["CX", "CZ", "CCX", "CP", "CRX", "CRY", "CRZ"] },
+  { title: "2-qubit", ids: ["SWAP", "ISWAP", "RXX", "RYY", "RZZ"] },
+  { title: "Otros", ids: ["BARRIER", "RESET", "M"] },
 ];
 
 const TAU = 2 * Math.PI;
 const deg = (r: number) => `${((r * 180) / Math.PI).toFixed(0)}°`;
+const PLABEL: Record<"theta" | "phi" | "lambda", string> = { theta: "θ", phi: "φ", lambda: "λ" };
 
 /** What to ask the user for next while staging a multi-qubit gate. */
 function pendingHint(pending: Pending): string {
@@ -19,6 +21,7 @@ function pendingHint(pending: Pending): string {
   const symbol = getGateDoc(pending.gate).symbol;
   const remaining = spec.arity - pending.qubits.length;
   if (spec.kind === "swap") return `${symbol}: elige el otro qubit a intercambiar`;
+  if (spec.kind === "two") return `${symbol}: elige el segundo qubit`;
   if (remaining <= 1) return `${symbol}: elige el qubit objetivo`;
   return `${symbol}: elige un qubit de control (${remaining} restantes)`;
 }
@@ -32,10 +35,7 @@ export function GatePalette() {
   const setDraftParam = useQuantum((s) => s.setDraftParam);
   const cancelPending = useQuantum((s) => s.cancelPending);
 
-  const parametric = selectedGate !== null && getGateDoc(selectedGate).parametric === true;
-  const paramKey = parametric ? GATES[selectedGate as GateId].params[0] : null;
-  const paramValue = paramKey ? draftParams[paramKey] ?? 0 : 0;
-  const paramLabel = paramKey === "phi" ? "φ" : "θ";
+  const paramKeys = selectedGate !== null ? GATES[selectedGate].params : [];
 
   return (
     <div className="flex flex-col gap-3 font-mono text-ink">
@@ -53,6 +53,11 @@ export function GatePalette() {
                   title={getGateDoc(id).name}
                   aria-label={getGateDoc(id).name}
                   aria-pressed={active}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("application/x-axiom-gate", JSON.stringify({ newGate: id }));
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
                   onClick={() => selectGate(id)}
                   className={`flex h-9 items-center justify-center rounded border text-[13px] transition focusable ${
                     active
@@ -68,26 +73,33 @@ export function GatePalette() {
         </div>
       ))}
 
-      {paramKey && (
+      {selectedGate && paramKeys.length > 0 && (
         <div className="rounded border border-line bg-void-soft/85 px-3 py-2 ring-1 ring-white/5">
-          <div className="mb-1 flex items-center justify-between text-[11px] text-graphite">
-            <span>
-              {paramLabel} de {getGateDoc(selectedGate as GateId).symbol}
-            </span>
-            <span className="font-mono text-vermilion-200 tabular-nums">
-              {paramValue.toFixed(2)} rad · {deg(paramValue)}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={TAU}
-            step={0.01}
-            value={paramValue}
-            aria-label={`Ángulo ${paramLabel}`}
-            onChange={(e) => setDraftParam(paramKey, Number(e.target.value))}
-            className="w-full"
-          />
+          {paramKeys.map((key) => {
+            const val = draftParams[key] ?? 0;
+            return (
+              <div key={key} className="mb-2 last:mb-0">
+                <div className="mb-1 flex items-center justify-between text-[11px] text-graphite">
+                  <span>
+                    {PLABEL[key]} de {getGateDoc(selectedGate).symbol}
+                  </span>
+                  <span className="font-mono text-vermilion-200 tabular-nums">
+                    {val.toFixed(2)} rad · {deg(val)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={TAU}
+                  step={0.01}
+                  value={val}
+                  aria-label={`Ángulo ${PLABEL[key]}`}
+                  onChange={(e) => setDraftParam(key, Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            );
+          })}
         </div>
       )}
 

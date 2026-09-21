@@ -46,9 +46,9 @@ export function QubitBloch({ vec }: { vec: V3 }) {
     geo: WebGLBuffer; geoCount: number; dyn: WebGLBuffer; pt: WebGLBuffer;
   } | null>(null);
 
-  // Latest vector for the imperative renderer.
-  const vecRef = useRef<V3>(vec);
-  vecRef.current = vec;
+  // The vector currently drawn (animated toward the incoming `vec` prop).
+  const drawnRef = useRef<V3>(vec);
+  const animRef = useRef(0);
 
   // Init GL once.
   useEffect(() => {
@@ -101,7 +101,7 @@ export function QubitBloch({ vec }: { vec: V3 }) {
     gl.drawArrays(gl.LINES, 0, g.geoCount);
 
     // State vector arrow (shorter when the qubit is mixed/entangled).
-    const vec = vecRef.current;
+    const vec = drawnRef.current;
     const dyn = buildDynamic(vec, [], false);
     gl.bindBuffer(gl.ARRAY_BUFFER, g.dyn); gl.bufferData(gl.ARRAY_BUFFER, dyn, gl.DYNAMIC_DRAW);
     bind(g.dyn);
@@ -133,8 +133,40 @@ export function QubitBloch({ vec }: { vec: V3 }) {
     }
   }
 
-  // Redraw whenever the incoming vector changes.
-  useEffect(() => { render(); }, [vec[0], vec[1], vec[2]]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Animate the drawn vector from its current value to the new `vec` over ~400ms
+  // (great-circle-ish: interpolate direction, lerp magnitude). Snaps if GL not ready.
+  useEffect(() => {
+    cancelAnimationFrame(animRef.current);
+    const from = drawnRef.current;
+    const to = vec;
+    const mag = (v: V3) => Math.hypot(v[0], v[1], v[2]);
+    const mf = mag(from), mt = mag(to);
+    const at = (t: number): V3 => {
+      if (mf < 1e-6 || mt < 1e-6) {
+        return [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t];
+      }
+      const d: V3 = [
+        from[0] / mf + (to[0] / mt - from[0] / mf) * t,
+        from[1] / mf + (to[1] / mt - from[1] / mf) * t,
+        from[2] / mf + (to[2] / mt - from[2] / mf) * t,
+      ];
+      const dl = Math.hypot(d[0], d[1], d[2]) || 1;
+      const m = mf + (mt - mf) * t;
+      return [(d[0] / dl) * m, (d[1] / dl) * m, (d[2] / dl) * m];
+    };
+    const start = performance.now();
+    const dur = 400;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / dur);
+      drawnRef.current = at(t);
+      render();
+      if (t < 1) animRef.current = requestAnimationFrame(step);
+      else { drawnRef.current = to; render(); }
+    };
+    animRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vec[0], vec[1], vec[2]]);
 
   useEffect(() => {
     const ro = new ResizeObserver(() => render());

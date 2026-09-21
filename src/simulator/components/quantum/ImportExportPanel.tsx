@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { useQuantum, toCircuit } from "../../quantum/quantumStore.ts";
 import { serialize, deserialize, toText } from "../../quantum/circuit.ts";
+import { downloadText } from "./downloads.ts";
 
 export function ImportExportPanel() {
   const numQubits = useQuantum((s) => s.numQubits);
@@ -44,14 +45,24 @@ export function ImportExportPanel() {
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="text-[10px] uppercase tracking-widest text-vermilion-300/70">Exportar</span>
-          <button
-            onClick={copy}
-            className="focusable rounded border border-line px-2.5 py-1 text-[11px] text-vermilion-300 transition hover:border-vermilion-400/50 hover:bg-vermilion-500/10"
-            title="Copiar el JSON del circuito al portapapeles"
-            aria-label="Copiar JSON"
-          >
-            {copied ? "Copiado ✓" : "Copiar JSON"}
-          </button>
+          <div className="flex gap-1.5">
+            <button
+              onClick={copy}
+              className="focusable rounded border border-line px-2.5 py-1 text-[11px] text-vermilion-300 transition hover:border-vermilion-400/50 hover:bg-vermilion-500/10"
+              title="Copiar el JSON del circuito al portapapeles"
+              aria-label="Copiar JSON"
+            >
+              {copied ? "Copiado ✓" : "Copiar JSON"}
+            </button>
+            <button
+              onClick={() => downloadText("circuito.json", json, "application/json")}
+              className="focusable rounded border border-line px-2.5 py-1 text-[11px] text-vermilion-300 transition hover:border-vermilion-400/50 hover:bg-vermilion-500/10"
+              title="Descargar el circuito como archivo .json"
+              aria-label="Descargar JSON"
+            >
+              Descargar JSON
+            </button>
+          </div>
         </div>
         <textarea
           readOnly

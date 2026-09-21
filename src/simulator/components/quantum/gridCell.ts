@@ -14,8 +14,11 @@ export type CellRole =
   | { kind: "empty" }
   | { kind: "single"; op: PlacedOp }
   | { kind: "control"; op: PlacedOp }
+  | { kind: "anticontrol"; op: PlacedOp }
   | { kind: "target"; op: PlacedOp }
   | { kind: "swap"; op: PlacedOp }
+  | { kind: "two"; op: PlacedOp }
+  | { kind: "barrier"; op: PlacedOp }
   | { kind: "measure"; op: PlacedOp };
 
 /** Classify this qubit's role within whatever op (if any) covers (qubit, column). */
@@ -24,10 +27,13 @@ export function cellRole(placements: PlacedOp[], qubit: number, column: number):
   if (!op) return { kind: "empty" };
   const spec = GATES[op.gate];
   if (spec.kind === "measure") return { kind: "measure", op };
+  if (spec.kind === "barrier") return { kind: "barrier", op };
   if (spec.kind === "swap") return { kind: "swap", op };
+  if (spec.kind === "two") return { kind: "two", op }; // both qubits show the gate box
   if (spec.kind === "controlled") {
     const target = op.qubits[op.qubits.length - 1];
-    return qubit === target ? { kind: "target", op } : { kind: "control", op };
+    if (qubit === target) return { kind: "target", op };
+    return op.openControls?.includes(qubit) ? { kind: "anticontrol", op } : { kind: "control", op };
   }
   return { kind: "single", op }; // arity-1 unitary
 }

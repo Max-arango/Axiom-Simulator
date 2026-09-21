@@ -217,3 +217,112 @@ describe("movePlacement (drag a gate)", () => {
     expect(st().placements[0].qubits).toEqual([0, 1]); // unchanged
   });
 });
+
+describe("undo / redo", () => {
+  it("undo removes a just-placed gate and redo restores it", () => {
+    s().selectGate("H");
+    s().cellClick(0, 0);
+    expect(s().placements.length).toBe(1);
+    s().undo();
+    expect(s().placements.length).toBe(0);
+    s().redo();
+    expect(s().placements.length).toBe(1);
+    expect(s().placements[0].gate).toBe("H");
+  });
+
+  it("undo on empty history is a no-op", () => {
+    s().undo();
+    expect(s().placements.length).toBe(0);
+    expect(s().past.length).toBe(0);
+    expect(s().future.length).toBe(0);
+  });
+
+  it("undo restores the original column/qubits after a move", () => {
+    s().selectGate("H");
+    s().cellClick(0, 0); // H @ q0,c0
+    const id = s().placements[0].id;
+    s().movePlacement(id, 0, 1, 2); // → q1, c2
+    expect(s().placements[0].qubits).toEqual([1]);
+    expect(s().placements[0].column).toBe(2);
+    s().undo();
+    expect(s().placements[0].qubits).toEqual([0]);
+    expect(s().placements[0].column).toBe(0);
+  });
+
+  it("undo after loadCircuit returns to the pre-load (empty) circuit", () => {
+    s().loadCircuit(BELL);
+    expect(s().placements.length).toBe(2);
+    s().undo();
+    expect(s().placements.length).toBe(0);
+  });
+
+  it("undo restores old params after updatePlacementParams", () => {
+    s().selectGate("RX");
+    s().cellClick(0, 0);
+    const id = s().placements[0].id;
+    const before = s().placements[0].params;
+    s().updatePlacementParams(id, { theta: 1.234 });
+    expect(s().placements[0].params?.theta).toBeCloseTo(1.234, 9);
+    s().undo();
+    expect(s().placements[0].params).toEqual(before);
+  });
+
+  it("a new mutation clears the redo stack", () => {
+    s().selectGate("H");
+    s().cellClick(0, 0);
+    s().undo();
+    expect(s().future.length).toBe(1);
+    s().selectGate("X");
+    s().cellClick(0, 0); // new placement → redo history dropped
+    expect(s().future.length).toBe(0);
+  });
+});
+
+describe("setOpenControls", () => {
+  it("keeps only control qubits, dedupes, and is undoable", () => {
+    s().selectGate("CX");
+    s().cellClick(0, 0); // control
+    s().cellClick(1, 0); // target → CX [0,1]
+    const id = s().placements[0].id;
+
+    s().setOpenControls(id, [0]); // 0 is a control
+    expect(s().placements[0].openControls).toEqual([0]);
+
+    s().setOpenControls(id, [1]); // 1 is the target → filtered out
+    expect(s().placements[0].openControls).toEqual([]);
+
+    s().undo(); // back to [0]
+    expect(s().placements[0].openControls).toEqual([0]);
+  });
+});
+
+describe("composites (subcircuit library)", () => {
+  const st = () => useQuantum.getState();
+
+  it("insertComposite stamps a built-in Bell block that yields the Bell state", () => {
+    st().setNumQubits(2);
+    st().insertComposite("bell", 0);
+    expect(st().placements.length).toBe(2); // H + CX
+    st().setStep(columnCount(st().placements));
+    const p = probabilities(currentState(st()));
+    expect(p[0]).toBeCloseTo(0.5, 6);
+    expect(p[3]).toBeCloseTo(0.5, 6);
+  });
+
+  it("saveComposite stores the current circuit, insertable later", () => {
+    st().setNumQubits(2);
+    st().selectGate("X");
+    st().cellClick(0, 0);
+    st().saveComposite("myX");
+    const def = st().composites.find((c) => c.name === "myX");
+    expect(def).toBeTruthy();
+    expect(def!.qubits).toBe(2);
+  });
+
+  it("insertComposite rejects when the block doesn't fit", () => {
+    st().setNumQubits(2);
+    st().insertComposite("ghz3", 0); // needs 3 qubits
+    expect(st().placements.length).toBe(0);
+    expect(st().error).toMatch(/no caben/);
+  });
+});

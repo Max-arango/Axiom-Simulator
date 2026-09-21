@@ -127,7 +127,7 @@ describe("norm & measurement no-op", () => {
 
 describe("guards", () => {
   it("rejects out-of-range indices and oversized registers", () => {
-    expect(() => zeroState(7)).toThrow(); // > MAX_QUBITS
+    expect(() => zeroState(9)).toThrow(); // > MAX_QUBITS (8)
     expect(() => applyMat2(zeroState(1), gateMatrix("X"), 3, 1)).toThrow();
     expect(() => applyControlled(zeroState(2), gateMatrix("X"), [0], 0, 2)).toThrow(); // control==target
     expect(() => applySwap(zeroState(2), 0, 5, 2)).toThrow();

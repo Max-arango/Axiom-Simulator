@@ -11,6 +11,17 @@ import { BlochPanel } from "./BlochPanel.tsx";
 import { EntanglementPanel } from "./EntanglementPanel.tsx";
 import { GateInspector } from "./GateInspector.tsx";
 import { LearnPanel } from "./LearnPanel.tsx";
+import { QSpherePanel } from "./QSpherePanel.tsx";
+import { QasmPanel } from "./QasmPanel.tsx";
+import { UndoRedoButtons } from "./UndoRedoButtons.tsx";
+import { ObservablesPanel } from "./ObservablesPanel.tsx";
+import { CorrelationPanel } from "./CorrelationPanel.tsx";
+import { PhaseDiskPanel } from "./PhaseDiskPanel.tsx";
+import { CompositesPanel } from "./CompositesPanel.tsx";
+import { MetricsBar } from "./MetricsBar.tsx";
+import { SavedCircuitsPanel } from "./SavedCircuitsPanel.tsx";
+import { KeyboardShortcuts } from "./KeyboardShortcuts.tsx";
+import { NoisePanel } from "./NoisePanel.tsx";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -21,13 +32,21 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-type Tab = "estado" | "medicion" | "bloch" | "entrelazamiento" | "inspector" | "aprender";
+type Tab =
+  | "estado" | "medicion" | "bloch" | "qsphere" | "fases"
+  | "entrelazamiento" | "correlacion" | "observables"
+  | "inspector" | "qasm" | "aprender";
 const TABS: { id: Tab; label: string }[] = [
   { id: "estado", label: "Statevector" },
   { id: "medicion", label: "Medición" },
   { id: "bloch", label: "Bloch" },
+  { id: "qsphere", label: "Q-sphere" },
+  { id: "fases", label: "Fases" },
   { id: "entrelazamiento", label: "Entrelazamiento" },
+  { id: "correlacion", label: "Info mutua" },
+  { id: "observables", label: "Observables" },
   { id: "inspector", label: "Inspector" },
+  { id: "qasm", label: "OpenQASM" },
   { id: "aprender", label: "Aprender" },
 ];
 
@@ -36,7 +55,11 @@ export function QuantumLabView() {
 
   return (
     <div className="flex h-full min-h-0 flex-1 bg-void text-ink">
+      <KeyboardShortcuts />
       <aside className="scroll-thin w-[340px] shrink-0 overflow-y-auto border-r border-line bg-void-soft/40">
+        <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+          <UndoRedoButtons />
+        </div>
         <Section title="Qubits">
           <QubitControls />
         </Section>
@@ -46,16 +69,28 @@ export function QuantumLabView() {
         <Section title="Ejecución paso a paso">
           <PlaybackControls />
         </Section>
+        <Section title="Ruido (Monte-Carlo)">
+          <NoisePanel />
+        </Section>
         <Section title="Ejemplos">
           <ExamplesPanel />
         </Section>
+        <Section title="Compuertas compuestas">
+          <CompositesPanel />
+        </Section>
         <Section title="Importar / Exportar">
           <ImportExportPanel />
+        </Section>
+        <Section title="Circuitos guardados">
+          <SavedCircuitsPanel />
         </Section>
       </aside>
 
       <main className="flex min-h-0 flex-1 flex-col">
         <div className="scroll-thin max-h-[45%] shrink-0 overflow-auto border-b border-line p-4">
+          <div className="mb-2">
+            <MetricsBar />
+          </div>
           <CircuitGrid />
         </div>
 
@@ -83,10 +118,20 @@ export function QuantumLabView() {
             <MeasurementPanel />
           ) : tab === "bloch" ? (
             <BlochPanel />
+          ) : tab === "qsphere" ? (
+            <QSpherePanel />
+          ) : tab === "fases" ? (
+            <PhaseDiskPanel />
           ) : tab === "entrelazamiento" ? (
             <EntanglementPanel />
+          ) : tab === "correlacion" ? (
+            <CorrelationPanel />
+          ) : tab === "observables" ? (
+            <ObservablesPanel />
           ) : tab === "inspector" ? (
             <GateInspector />
+          ) : tab === "qasm" ? (
+            <QasmPanel />
           ) : (
             <LearnPanel />
           )}

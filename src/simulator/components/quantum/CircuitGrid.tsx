@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useQuantum, columnCount, placementAt, type PlacedOp } from "../../quantum/quantumStore.ts";
 import { getGateDoc } from "../../quantum/gateDocs.ts";
 import { cellRole, columnSpan, type CellRole } from "./gridCell.ts";
+import type { GateId } from "../../quantum/types.ts";
 
-// Payload carried by a drag: which op, grabbed from which qubit row.
-type DragData = { opId: string; fromQubit: number };
+// Payload carried by a drag: either MOVE an existing op (grabbed from a qubit row)
+// or PLACE a new gate dragged from the palette.
+type DragData = { opId: string; fromQubit: number } | { newGate: GateId };
 const DRAG_MIME = "application/x-axiom-gate";
 
 // ponytail: row height is hardcoded to match Tailwind h-12 (48px) because the
@@ -23,6 +25,7 @@ export function CircuitGrid() {
   const cellClick = useQuantum((s) => s.cellClick);
   const selectPlacement = useQuantum((s) => s.selectPlacement);
   const movePlacement = useQuantum((s) => s.movePlacement);
+  const selectGate = useQuantum((s) => s.selectGate);
 
   const cols = Math.max(columnCount(placements) + 1, MIN_COLS);
   const rows = Array.from({ length: numQubits }, (_, i) => i);
@@ -34,8 +37,14 @@ export function CircuitGrid() {
     cellClick(qubit, column);
   };
 
-  const onDropCell = (data: DragData, toQubit: number, toColumn: number) =>
-    movePlacement(data.opId, data.fromQubit, toQubit, toColumn);
+  const onDropCell = (data: DragData, toQubit: number, toColumn: number) => {
+    if ("newGate" in data) {
+      selectGate(data.newGate); // place a gate dragged from the palette
+      cellClick(toQubit, toColumn);
+    } else {
+      movePlacement(data.opId, data.fromQubit, toQubit, toColumn);
+    }
+  };
 
   return (
     <div className="flex select-none font-mono text-sm text-ink">
@@ -154,7 +163,9 @@ function Cell({
     if (!raw) return null;
     try {
       const d = JSON.parse(raw);
-      return typeof d?.opId === "string" && Number.isInteger(d?.fromQubit) ? d : null;
+      if (typeof d?.opId === "string" && Number.isInteger(d?.fromQubit)) return d;
+      if (typeof d?.newGate === "string") return d;
+      return null;
     } catch {
       return null;
     }
@@ -208,6 +219,18 @@ function renderRole(role: CellRole, ring: string): React.ReactNode {
       );
     case "control":
       return <span className={`size-3 rounded-full bg-vermilion-300 ${ring}`} />;
+    case "anticontrol":
+      return <span className={`size-3 rounded-full border-2 border-vermilion-300 bg-void-soft ${ring}`} />;
+    case "two":
+      return (
+        <span
+          className={`flex h-9 min-w-9 items-center justify-center rounded border border-vermilion-400/70 bg-void-soft px-1 text-[11px] text-vermilion-100 ${ring}`}
+        >
+          {getGateDoc(role.op.gate).symbol}
+        </span>
+      );
+    case "barrier":
+      return <span className={`h-9 w-0 border-l-2 border-dashed border-graphite/70 ${ring}`} />;
     case "target":
       return (
         <span
@@ -235,10 +258,16 @@ function cellTitle(role: CellRole): string {
       return "Celda vacía — clic para colocar la puerta seleccionada";
     case "control":
       return `${getGateDoc(role.op.gate).name} — control`;
+    case "anticontrol":
+      return `${getGateDoc(role.op.gate).name} — control abierto (|0⟩)`;
     case "target":
       return `${getGateDoc(role.op.gate).name} — objetivo`;
     case "swap":
       return "SWAP";
+    case "two":
+      return getGateDoc(role.op.gate).name;
+    case "barrier":
+      return "Barrier";
     case "measure":
       return "Medición";
     case "single":

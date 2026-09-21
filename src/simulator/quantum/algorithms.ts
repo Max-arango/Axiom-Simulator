@@ -39,16 +39,20 @@ export const ALGORITHMS: PresetSpec[] = [
     id: "teleportation",
     name: "Quantum Teleportation",
     description:
-      "q1/q2 share a Bell pair; a Bell measurement on q0/q1 teleports q0's state to q2.",
+      "Teleporta el estado de q0 (aquí |1⟩) a q2 usando un par de Bell (q1,q2), medición de Bell y corrección clásica condicional (c_if). q2 acaba en el estado original en toda ejecución.",
     circuit: {
       qubits: 3,
+      clbits: 3,
       ops: [
+        op("X", [0]), // mensaje a teleportar: |1⟩ (cámbialo por H, RX(θ)… para otro estado)
         op("H", [1]),
-        op("CX", [1, 2]), // Bell pair on q1,q2
-        op("CX", [0, 1]), // Bell measurement basis on q0,q1
+        op("CX", [1, 2]), // par de Bell en q1,q2
+        op("CX", [0, 1]), // base de medición de Bell en q0,q1
         op("H", [0]),
-        op("M", [0]),
-        op("M", [1]),
+        { gate: "M", qubits: [0], clbit: 0 },
+        { gate: "M", qubits: [1], clbit: 1 },
+        { gate: "X", qubits: [2], condition: { clbit: 1, value: 1 } }, // corrección condicional
+        { gate: "Z", qubits: [2], condition: { clbit: 0, value: 1 } },
       ],
     },
   },
@@ -94,6 +98,45 @@ export const ALGORITHMS: PresetSpec[] = [
         op("H", [0]),
         op("H", [1]),
       ],
+    },
+  },
+  {
+    id: "superdense",
+    name: "Codificación superdensa",
+    description:
+      "Con un par de Bell compartido, Alice envía 2 bits clásicos (aquí '11') manipulando solo su qubit; Bob los recupera. Codifica X·Z en q0 y decodifica con CX+H.",
+    circuit: {
+      qubits: 2,
+      ops: [
+        op("H", [0]),
+        op("CX", [0, 1]), // par de Bell
+        op("Z", [0]), // Alice codifica el mensaje "11" (Z luego X)
+        op("X", [0]),
+        op("CX", [0, 1]), // Bob decodifica
+        op("H", [0]),
+        { gate: "M", qubits: [0], clbit: 0 },
+        { gate: "M", qubits: [1], clbit: 1 },
+      ],
+    },
+  },
+  {
+    id: "kickback",
+    name: "Phase kickback",
+    description:
+      "El ancilla en |1⟩ (autoestado de X con autovalor −1) devuelve una fase al qubit de control a través de un CNOT: base del algoritmo de Deutsch y de la estimación de fase.",
+    circuit: {
+      qubits: 2,
+      ops: [op("X", [1]), op("H", [0]), op("H", [1]), op("CX", [0, 1]), op("H", [1])],
+    },
+  },
+  {
+    id: "bitflip",
+    name: "Código bit-flip (3 qubits)",
+    description:
+      "Código de repetición: codifica un qubit lógico (aquí |1⟩) en 3 físicos con dos CNOT. Base de la corrección de errores frente a inversiones de bit.",
+    circuit: {
+      qubits: 3,
+      ops: [op("X", [0]), op("CX", [0, 1]), op("CX", [0, 2])],
     },
   },
 ];
