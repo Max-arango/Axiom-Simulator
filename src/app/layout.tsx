@@ -101,8 +101,12 @@ export const metadata: Metadata = {
   },
   category: "science",
   verification: {
-    // Add your Google Search Console verification token here once you claim the site:
-    // google: "YOUR_VERIFICATION_TOKEN",
+    // Paste your Google Search Console HTML-tag token here after verifying:
+    // google: process.env.GOOGLE_SITE_VERIFICATION,
+    other: {
+      // Paste your Bing Webmaster Tools verification code here:
+      // "msvalidate.01": process.env.BING_SITE_VERIFICATION ?? "",
+    },
   },
 };
 

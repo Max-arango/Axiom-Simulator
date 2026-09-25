@@ -10,6 +10,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
             <Logo />
           </Link>
           <nav className="flex gap-4 text-sm text-graphite">
+            <Link href="/legal/terminos" className="hover:text-ink transition-colors">Términos</Link>
             <Link href="/legal/privacidad" className="hover:text-ink transition-colors">Privacidad</Link>
             <Link href="/legal/cookies" className="hover:text-ink transition-colors">Cookies</Link>
           </nav>

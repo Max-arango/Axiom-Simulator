@@ -17,6 +17,7 @@ const PAGE_LINKS = [
 ] as const;
 
 const LEGAL_LINKS = [
+  { label: "Términos", href: "/legal/terminos" },
   { label: "Privacidad", href: "/legal/privacidad" },
   { label: "Cookies", href: "/legal/cookies" },
 ] as const;
@@ -96,6 +97,7 @@ export function Footer() {
             © {year} {SITE.name} · {SITE.license} License
           </p>
           <div className="flex items-center gap-4">
+            <a href="/legal/terminos" className="mono-label text-graphite/70 hover:text-graphite transition-colors">Términos</a>
             <a href="/legal/privacidad" className="mono-label text-graphite/70 hover:text-graphite transition-colors">Privacidad</a>
             <a href="/legal/cookies" className="mono-label text-graphite/70 hover:text-graphite transition-colors">Cookies</a>
           </div>
