@@ -504,6 +504,99 @@ function NotebookVisual() {
   );
 }
 
+function LifeMini() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [wrapRef, inView] = useInView<HTMLDivElement>({ threshold: 0.2 });
+  const reduced =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  useEffect(() => {
+    if (!inView) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const CW = 150;
+    const CH = 100;
+    canvas.width = CW;
+    canvas.height = CH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const COLS = 30;
+    const ROWS = 20;
+    const CS = CW / COLS; // cell size
+    let grid = new Uint8Array(COLS * ROWS);
+    let next = new Uint8Array(COLS * ROWS);
+
+    // Seed: glider + r-pentomino near center
+    const seed: Array<[number, number]> = [
+      [2, 1], [3, 2], [1, 3], [2, 3], [3, 3],         // glider
+      [14, 8], [15, 8], [13, 9], [14, 9], [15, 10],   // r-pentomino-ish
+      [20, 4], [21, 4], [22, 4], [21, 3],              // blinker + dot
+    ];
+    for (const [c, r] of seed) grid[r * COLS + c] = 1;
+
+    const step = () => {
+      next.fill(0);
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          let n = 0;
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              const nr = r + dr;
+              const nc = c + dc;
+              if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                n += grid[nr * COLS + nc];
+              }
+            }
+          }
+          const alive = grid[r * COLS + c];
+          next[r * COLS + c] = alive ? (n === 2 || n === 3 ? 1 : 0) : (n === 3 ? 1 : 0);
+        }
+      }
+      const tmp = grid; grid = next; next = tmp;
+    };
+
+    const draw = () => {
+      ctx.fillStyle = "#131311";
+      ctx.fillRect(0, 0, CW, CH);
+      ctx.fillStyle = "#e0673d";
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (grid[r * COLS + c]) {
+            ctx.fillRect(c * CS + 0.5, r * CS + 0.5, CS - 1, CS - 1);
+          }
+        }
+      }
+    };
+
+    let raf = 0;
+    let lastTick = 0;
+    const MS_PER_GEN = 120;
+
+    draw();
+    if (!reduced) {
+      const tick = (now: number) => {
+        if (now - lastTick > MS_PER_GEN) {
+          lastTick = now;
+          step();
+          draw();
+        }
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    }
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, [inView, reduced]);
+
+  return (
+    <div ref={wrapRef} className="pointer-events-none absolute inset-0 flex items-center justify-center bg-void">
+      <canvas ref={canvasRef} aria-hidden="true" className="h-full w-full" style={{ imageRendering: "pixelated" }} />
+    </div>
+  );
+}
+
 function DocsVisual() {
   const symbols = ["Σ", "∫", "∇", "∂", "π", "ℝ"];
   return (
@@ -558,6 +651,8 @@ export function WorkspaceVisual({ id }: { id: WorkspaceId }) {
       return <TopologyVisual />;
     case "dynamics":
       return <DynamicsVisual />;
+    case "game_of_life":
+      return <LifeMini />;
     case "inspector":
       return <InspectorVisual />;
     case "notebook":

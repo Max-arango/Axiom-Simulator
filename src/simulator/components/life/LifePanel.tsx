@@ -26,7 +26,7 @@ export function LifePanel() {
     generation, population, births, deaths, width, height,
     density, seed, setDensity, setSeed,
     selectedPatternId, setSelectedPattern,
-    resizeGrid,
+    resizeGrid, fitToScreen,
   } = useLifeStore();
 
   const [gridW, setGridW] = useState(width);
@@ -53,6 +53,14 @@ export function LifePanel() {
           <button className={btnBase} onClick={step} title="Step one generation (N)">⏭ Step</button>
           <button className={btnBase} onClick={reset} title="Reset (R)">↻ Reset</button>
           <button className={btnBase} onClick={clear} title="Clear (C)">✕ Clear</button>
+          <button
+            className={btnBase}
+            title="Fit grid to screen"
+            onClick={() => {
+              const main = document.querySelector("main.relative");
+              if (main) fitToScreen(main.clientWidth, main.clientHeight);
+            }}
+          >⊡ Fit</button>
         </div>
         <p className="mt-2 text-[10px] text-graphite">Space · N · R · C · Esc</p>
       </Section>

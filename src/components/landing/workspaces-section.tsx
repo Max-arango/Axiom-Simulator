@@ -25,13 +25,13 @@ export function WorkspacesSection() {
                 <em className="text-vermilion">mathematical universe.</em>
               </>
             }
-            description="Nine workspaces, one shared core. Each card is a small, live piece of the mathematics inside."
+            description="Ten workspaces, one shared core. Each card is a small, live piece of the mathematics inside."
           />
         </Reveal>
 
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
           {workspaceMetadata.map((ws, i) => {
-            const dark = ws.id === "fractal_lab" || ws.id === "four_d";
+            const dark = ws.id === "fractal_lab" || ws.id === "four_d" || ws.id === "game_of_life";
             return (
               <Reveal key={ws.id} delay={(i % 3) * 70}>
                 <Link

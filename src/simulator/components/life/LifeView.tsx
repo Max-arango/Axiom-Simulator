@@ -1,13 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLifeStore } from "../../life/store.ts";
 import { LifePanel } from "./LifePanel.tsx";
 import { LifeCanvas } from "./LifeCanvas.tsx";
 
-// Drives the simulation at `speed` gens/second using setInterval.
 function useLifeDriver() {
   const running = useLifeStore((s) => s.running);
   const speed = useLifeStore((s) => s.speed);
-
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => useLifeStore.getState().tick(), 1000 / speed);
@@ -15,7 +13,6 @@ function useLifeDriver() {
   }, [running, speed]);
 }
 
-// Global keyboard shortcuts for the GoL workspace.
 function useLifeKeys() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -39,6 +36,14 @@ function useLifeKeys() {
 export function LifeView() {
   useLifeDriver();
   useLifeKeys();
+
+  // Auto-randomize once when the workspace first mounts.
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    useLifeStore.getState().randomize();
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 flex-1 bg-void text-ink">

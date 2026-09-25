@@ -55,6 +55,7 @@ interface LifeState {
   setDensity(d: number): void;
   setSeed(s: number): void;
   resizeGrid(w: number, h: number): void;
+  fitToScreen(canvasW: number, canvasH: number): void;
 }
 
 export const useLifeStore = create<LifeState>((set, get) => ({
@@ -160,5 +161,20 @@ export const useLifeStore = create<LifeState>((set, get) => ({
     const ch = Math.max(10, Math.min(MAX_DIM, h));
     _engine = _engine.resize(cw, ch);
     set({ width: cw, height: ch, renderTick: get().renderTick + 1 });
+  },
+
+  fitToScreen: (canvasW, canvasH) => {
+    const { width, height } = get();
+    const margin = 24;
+    const scaleX = (canvasW - margin * 2) / width;
+    const scaleY = (canvasH - margin * 2) / height;
+    const cellSize = Math.max(2, Math.min(64, Math.floor(Math.min(scaleX, scaleY))));
+    const gridW = width * cellSize;
+    const gridH = height * cellSize;
+    set({
+      cellSize,
+      panX: (canvasW - gridW) / 2,
+      panY: (canvasH - gridH) / 2,
+    });
   },
 }));

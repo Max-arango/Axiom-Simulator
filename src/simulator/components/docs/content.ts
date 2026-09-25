@@ -671,6 +671,107 @@ G_{\mu\nu} &= R_{\mu\nu} - \tfrac{1}{2}g_{\mu\nu}R
       ),
     ],
   },
+  // ── Game of Life ────────────────────────────────────────────────────────────
+  {
+    id: "cellular-automata",
+    title: { en: "Cellular Automata — Game of Life", es: "Autómatas Celulares — Juego de la Vida" },
+    blocks: [
+      p(
+        "Conway's Game of Life is a zero-player cellular automaton devised by the British mathematician John Horton Conway in 1970. It is a classic example of how extremely simple local rules can produce arbitrarily complex global behaviour — from stable still lifes to self-replicating structures and universal computation.",
+        "El Juego de la Vida de Conway es un autómata celular de cero jugadores diseñado por el matemático británico John Horton Conway en 1970. Es un ejemplo clásico de cómo reglas locales extremadamente simples pueden producir comportamientos globales arbitrariamente complejos: desde estructuras estables hasta estructuras autoreplicantes y computación universal.",
+      ),
+      h("The universe", "El universo"),
+      p(
+        "The grid is an infinite (or, here, finite) two-dimensional orthogonal lattice. Each lattice point is a cell that at any moment is in one of two states: alive (1) or dead (0). This thesis, AXIOM uses a finite W × H grid with a dead boundary (cells outside the grid count as 0).",
+        "La cuadrícula es un retículo ortogonal bidimensional infinito (o, aquí, finito). Cada punto del retículo es una célula que en cualquier momento tiene uno de dos estados: viva (1) o muerta (0). AXIOM usa una cuadrícula finita W × H con borde muerto (las células fuera de la cuadrícula cuentan como 0).",
+      ),
+      h("Moore neighbourhood", "Vecindad de Moore"),
+      p(
+        "Each cell (r, c) has exactly 8 neighbours: the cells at (r±1, c), (r, c±1) and the four diagonals (r±1, c±1). This is the Moore neighbourhood of range 1. Counting alive neighbours is the only input to the transition function.",
+        "Cada célula (r, c) tiene exactamente 8 vecinos: las células en (r±1, c), (r, c±1) y las cuatro diagonales (r±1, c±1). Esta es la vecindad de Moore de rango 1. Contar vecinos vivos es la única entrada a la función de transición.",
+      ),
+      math(String.raw`N(r,c) \;=\; \sum_{\substack{dr \in \{-1,0,1\} \\ dc \in \{-1,0,1\} \\ (dr,dc)\neq(0,0)}} \text{cells}[r+dr,\,c+dc]`),
+      h("Transition rules", "Reglas de transición"),
+      ul(
+        [
+          "Alive, N = 2 or 3 → survives (underpopulation / overcrowding avoided).",
+          "Alive, N < 2 → dies (underpopulation).",
+          "Alive, N > 3 → dies (overcrowding).",
+          "Dead, N = 3 → born (reproduction).",
+        ],
+        [
+          "Viva, N = 2 ó 3 → sobrevive (se evita subpoblación / saturación).",
+          "Viva, N < 2 → muere (subpoblación).",
+          "Viva, N > 3 → muere (saturación).",
+          "Muerta, N = 3 → nace (reproducción).",
+        ],
+      ),
+      p(
+        "Critically, the update is simultaneous: every cell's next state is computed from the current generation, and all cells flip at once. This forbids sequential or in-place updates.",
+        "El aspecto crítico es que la actualización es simultánea: el siguiente estado de cada célula se calcula a partir de la generación actual, y todas las células cambian a la vez. Esto prohíbe actualizaciones secuenciales o in-place.",
+      ),
+      math(String.raw`\text{cells}_{t+1}[r,c] = \begin{cases} 1 & \text{if alive and } N \in \{2,3\} \\ 1 & \text{if dead and } N = 3 \\ 0 & \text{otherwise} \end{cases}`),
+      h("Implementation", "Implementación"),
+      p(
+        "AXIOM implements the engine as a flat Uint8Array of W × H bytes with a double buffer: cells (current state) and scratch (next state). nextGeneration() reads from cells and writes to scratch, then swaps the two references. This gives O(W × H) time and O(W × H) space per generation with no per-step allocation.",
+        "AXIOM implementa el motor como un Uint8Array plano de W × H bytes con doble buffer: cells (estado actual) y scratch (estado siguiente). nextGeneration() lee de cells y escribe en scratch, luego intercambia las dos referencias. Esto da tiempo O(W × H) y espacio O(W × H) por generación sin asignaciones por paso.",
+      ),
+      code(`// Double-buffer swap (pseudocode)
+for each (row, col):
+  n = count_moore_neighbours(cells, row, col)
+  scratch[row * W + col] = rule(cells[row * W + col], n)
+swap(cells, scratch)   // O(1) reference swap`),
+      h("Pattern taxonomy", "Taxonomía de patrones"),
+      ul(
+        [
+          "Still lifes — patterns that do not change from one generation to the next (e.g. Block, Beehive).",
+          "Oscillators — patterns that return to their initial state after p generations; p is the period (e.g. Blinker p=2, Pulsar p=3).",
+          "Spaceships — oscillators that translate across the grid each period (e.g. Glider, LWSS).",
+          "Guns — infinite-growth patterns that periodically emit spaceships (e.g. Gosper Glider Gun, period 30).",
+          "Methuselahs — small patterns that take many generations to stabilise (e.g. R-pentomino, 1103 generations).",
+        ],
+        [
+          "Vida estable — patrones que no cambian de una generación a la siguiente (p. ej. Block, Beehive).",
+          "Osciladores — patrones que regresan a su estado inicial después de p generaciones; p es el período (p. ej. Blinker p=2, Pulsar p=3).",
+          "Naves espaciales — osciladores que se trasladan por la cuadrícula cada período (p. ej. Glider, LWSS).",
+          "Cañones — patrones de crecimiento infinito que emiten naves periódicamente (p. ej. Gosper Glider Gun, período 30).",
+          "Matusalenes — patrones pequeños que tardan muchas generaciones en estabilizarse (p. ej. R-pentomino, 1103 generaciones).",
+        ],
+      ),
+      h("Complexity and universality", "Complejidad y universalidad"),
+      p(
+        "Despite its simplicity, the Game of Life is Turing-complete: it can simulate any Turing machine. Patterns have been constructed that implement logic gates, memory, and even a full von-Neumann computer. The question of whether a given initial configuration eventually dies out is undecidable (equivalent to the halting problem).",
+        "A pesar de su simplicidad, el Juego de la Vida es Turing-completo: puede simular cualquier máquina de Turing. Se han construido patrones que implementan compuertas lógicas, memoria e incluso un ordenador von-Neumann completo. La pregunta de si una configuración inicial dada eventualmente muere es indecidible (equivalente al problema de la parada).",
+      ),
+      h("Controls quick-reference", "Referencia rápida de controles"),
+      ul(
+        [
+          "Click — toggle a cell alive/dead.",
+          "Click + drag — paint/erase (consistent with the first cell toggled).",
+          "Right-click or Alt+click — erase.",
+          "Scroll wheel — zoom in/out, centered on cursor.",
+          "Middle-drag or Space+drag — pan the viewport.",
+          "Space — play / pause the simulation.",
+          "N — step one generation.",
+          "R — reset (clear and re-randomize).",
+          "C — clear all cells.",
+          "Esc — deselect the current pattern.",
+        ],
+        [
+          "Clic — alternar una célula viva/muerta.",
+          "Clic + arrastrar — pintar/borrar (consistente con la primera célula alternada).",
+          "Clic derecho o Alt+clic — borrar.",
+          "Rueda del ratón — zoom in/out, centrado en el cursor.",
+          "Clic central + arrastrar o Espacio+arrastrar — desplazar la vista.",
+          "Espacio — ejecutar / pausar la simulación.",
+          "N — avanzar una generación.",
+          "R — resetear (limpiar y rerandomizar).",
+          "C — limpiar todas las células.",
+          "Esc — deseleccionar el patrón actual.",
+        ],
+      ),
+    ],
+  },
 ];
 
 export const UI = {

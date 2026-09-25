@@ -14,6 +14,7 @@ export type WorkspaceId =
   | "four_d"
   | "topology"
   | "dynamics"
+  | "game_of_life"
   | "inspector"
   | "notebook"
   | "docs";
@@ -91,6 +92,16 @@ export const workspaceMetadata: Workspace[] = [
     sortOrder: 6,
   },
   {
+    id: "game_of_life",
+    workspace: "game_of_life",
+    name: "Game of Life",
+    description: "Conway's cellular automaton — emergent complexity from four rules",
+    icon: "life",
+    route: "/life",
+    enabled: true,
+    sortOrder: 7,
+  },
+  {
     id: "inspector",
     workspace: "inspector",
     name: "Inspector",
@@ -98,7 +109,7 @@ export const workspaceMetadata: Workspace[] = [
     icon: "inspector",
     route: "/inspector",
     enabled: true,
-    sortOrder: 7,
+    sortOrder: 8,
   },
   {
     id: "notebook",
@@ -108,7 +119,7 @@ export const workspaceMetadata: Workspace[] = [
     icon: "notebook",
     route: "/notebook",
     enabled: true,
-    sortOrder: 8,
+    sortOrder: 9,
   },
   {
     id: "docs",
@@ -118,7 +129,7 @@ export const workspaceMetadata: Workspace[] = [
     icon: "docs",
     route: "/docs",
     enabled: true,
-    sortOrder: 9,
+    sortOrder: 10,
   },
 ];
 
