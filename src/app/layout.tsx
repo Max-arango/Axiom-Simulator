@@ -91,14 +91,47 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
   category: "science",
+  verification: {
+    // Add your Google Search Console verification token here once you claim the site:
+    // google: "YOUR_VERIFICATION_TOKEN",
+  },
 };
 
 export const viewport: Viewport = {
   themeColor: "#faf9f5",
   width: "device-width",
   initialScale: 1,
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "AXIOM",
+  url: SITE_URL,
+  description: SITE_DESCRIPTION,
+  applicationCategory: "EducationalApplication",
+  operatingSystem: "Any",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+  author: {
+    "@type": "Person",
+    name: "Max-arango",
+    url: "https://github.com/Max-arango",
+  },
+  license: "https://opensource.org/licenses/MIT",
+  keywords: "mathematics, graphing calculator, fractals, topology, dynamics, game of life, quantum computing, 4D geometry",
 };
 
 export default function RootLayout({
@@ -108,6 +141,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body
         className={`${inter.variable} ${instrument.variable} ${jetbrains.variable} font-sans antialiased bg-background text-foreground min-h-screen flex flex-col`}
       >
