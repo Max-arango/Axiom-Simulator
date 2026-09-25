@@ -43,7 +43,7 @@ const jetbrains = localFont({
   display: "swap",
 });
 
-const SITE_URL = "https://mathematics-simulator.vercel.app";
+const SITE_URL = "https://axiom-simulator.vercel.app";
 const SITE_TITLE = "AXIOM — Explore Mathematics";
 const SITE_DESCRIPTION =
   "An open-source mathematical exploration environment for graphing, fractals, topology, dynamics, geometry, and more.";

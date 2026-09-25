@@ -4,7 +4,7 @@
  */
 export const SITE = {
   name: "AXIOM",
-  url: "https://mathematics-simulator.vercel.app",
+  url: "https://axiom-simulator.vercel.app",
   /** Internal route for the ported simulator SPA (was `url`, now same-app). */
   simulatorPath: "/simulator",
   github: "https://github.com/Max-arango/Mathematics-simulator",

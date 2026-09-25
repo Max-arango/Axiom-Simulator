@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const BASE = "https://mathematics-simulator.vercel.app";
+const BASE = "https://axiom-simulator.vercel.app";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
