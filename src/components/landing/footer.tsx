@@ -16,12 +16,17 @@ const PAGE_LINKS = [
   { label: "Notebook", href: "#notebook" },
 ] as const;
 
+const LEGAL_LINKS = [
+  { label: "Privacidad", href: "/legal/privacidad" },
+  { label: "Cookies", href: "/legal/cookies" },
+] as const;
+
 export function Footer() {
   const year = new Date().getFullYear();
   return (
     <footer className="mt-auto border-t border-line bg-paper">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="grid gap-10 py-12 md:grid-cols-[1.5fr,1fr,1fr] md:gap-8">
+        <div className="grid gap-10 py-12 md:grid-cols-[1.5fr,1fr,1fr,1fr] md:gap-8">
           <div className="max-w-sm">
             <Logo />
             <p className="mt-4 text-sm leading-relaxed text-graphite">
@@ -68,15 +73,32 @@ export function Footer() {
               ))}
             </ul>
           </nav>
+
+          <nav aria-label="Legal">
+            <h3 className="mono-label text-graphite">Legal</h3>
+            <ul className="mt-4 space-y-2.5">
+              {LEGAL_LINKS.map((link) => (
+                <li key={link.href}>
+                  <a
+                    href={link.href}
+                    className="focusable rounded-sm text-sm font-medium text-ink/80 transition-colors hover:text-vermilion"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
 
         <div className="flex flex-col items-start justify-between gap-3 border-t border-line/70 py-6 pb-8 sm:flex-row sm:items-center">
           <p className="font-mono text-[11px] tabular-nums text-graphite">
             © {year} {SITE.name} · {SITE.license} License
           </p>
-          <p className="mono-label text-graphite/70">
-            Built for exploring mathematics.
-          </p>
+          <div className="flex items-center gap-4">
+            <a href="/legal/privacidad" className="mono-label text-graphite/70 hover:text-graphite transition-colors">Privacidad</a>
+            <a href="/legal/cookies" className="mono-label text-graphite/70 hover:text-graphite transition-colors">Cookies</a>
+          </div>
         </div>
       </div>
     </footer>

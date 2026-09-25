@@ -1,3 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
 User-agent: Googlebot
 Allow: /
 
@@ -10,5 +15,7 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
-User-agent: *
+User-agent: LinkedInBot
 Allow: /
+
+Sitemap: https://mathematics-simulator.vercel.app/sitemap.xml
