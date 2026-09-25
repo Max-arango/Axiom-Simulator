@@ -4,8 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/fellcrack/Trabajo/Personal/proyects/Mathematics/Mathematics-landing
+WorkingDirectory=/home/fellcrack/Trabajo/Personal/Proyects/Axiom-Simulator
 Environment=NODE_ENV=production
+EnvironmentFile=-%h/Trabajo/Personal/Proyects/Axiom-Simulator/.env.local
 ExecStart=/home/fellcrack/.bun/bin/bun .next/standalone/server.js
 Restart=always
 RestartSec=2

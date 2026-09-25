@@ -44,9 +44,9 @@ const jetbrains = localFont({
 });
 
 const SITE_URL = "https://axiom-simulator.vercel.app";
-const SITE_TITLE = "AXIOM — Explore Mathematics";
+const SITE_TITLE = "AXIOM — Open-Source Math Simulator";
 const SITE_DESCRIPTION =
-  "An open-source mathematical exploration environment for graphing, fractals, topology, dynamics, geometry, and more.";
+  "AXIOM is a free, open-source mathematics simulator with 10 interactive workspaces: graphing calculator, Mandelbrot fractals, Conway's Game of Life, quantum circuits, topology, 4D geometry, dynamical systems and more.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -56,18 +56,23 @@ export const metadata: Metadata = {
   },
   description: SITE_DESCRIPTION,
   keywords: [
-    "mathematics",
-    "math visualization",
-    "graphing calculator",
-    "fractals",
-    "mandelbrot",
-    "dynamical systems",
-    "phase portrait",
-    "topology",
+    "axiom simulator",
+    "axiom math",
+    "axiom mathematics",
+    "math simulator",
+    "mathematics simulator",
+    "open source math",
+    "graphing calculator online",
+    "mandelbrot fractal explorer",
+    "game of life simulator",
+    "conway game of life",
+    "quantum circuit simulator",
+    "topology explorer",
+    "dynamical systems simulator",
     "4D geometry",
-    "tesseract",
-    "bloch sphere",
-    "open source",
+    "interactive mathematics",
+    "math playground",
+    "free math tools",
   ],
   authors: [{ name: "Max-arango" }],
   creator: "Max-arango",
@@ -116,24 +121,49 @@ export const viewport: Viewport = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebApplication",
+  "@type": "SoftwareApplication",
   name: "AXIOM",
+  alternateName: ["AXIOM Simulator", "Axiom Math Simulator", "axiom-simulator"],
   url: SITE_URL,
   description: SITE_DESCRIPTION,
   applicationCategory: "EducationalApplication",
-  operatingSystem: "Any",
+  applicationSubCategory: "Mathematics",
+  operatingSystem: "Web Browser",
+  browserRequirements: "Requires JavaScript. WebGL recommended.",
+  isAccessibleForFree: true,
   offers: {
     "@type": "Offer",
     price: "0",
     priceCurrency: "USD",
+    availability: "https://schema.org/InStock",
   },
   author: {
     "@type": "Person",
     name: "Max-arango",
     url: "https://github.com/Max-arango",
   },
+  creator: {
+    "@type": "Person",
+    name: "Max-arango",
+    url: "https://github.com/Max-arango",
+  },
+  codeRepository: "https://github.com/Max-arango/Axiom-Simulator",
   license: "https://opensource.org/licenses/MIT",
-  keywords: "mathematics, graphing calculator, fractals, topology, dynamics, game of life, quantum computing, 4D geometry",
+  keywords: "axiom simulator, math simulator, graphing calculator, mandelbrot fractal, game of life, quantum circuit simulator, topology, 4D geometry, dynamical systems, open source mathematics",
+  featureList: [
+    "2D and 3D graphing calculator",
+    "GPU-accelerated Mandelbrot and Julia set fractals",
+    "Bloch sphere qubit visualization",
+    "Quantum circuit simulator",
+    "4D geometry and tesseract projection",
+    "Topology and homeomorphism explorer",
+    "Dynamical systems and phase portraits",
+    "Conway's Game of Life with pattern library",
+    "Mathematical structure inspector",
+    "Reproducible math notebook",
+  ],
+  screenshot: `${SITE_URL}/opengraph-image`,
+  softwareVersion: "0.2.1",
 };
 
 export default function RootLayout({
