@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { GameOfLifeEngine } from "./engine.ts";
 import { PATTERN_BY_ID } from "./patterns.ts";
+import { type LifeSnapshot } from "./snapshot.ts";
 
 const DEFAULT_WIDTH = 100;
 const DEFAULT_HEIGHT = 80;
@@ -56,6 +57,7 @@ interface LifeState {
   setSeed(s: number): void;
   resizeGrid(w: number, h: number): void;
   fitToScreen(canvasW: number, canvasH: number): void;
+  loadSnapshot(snap: LifeSnapshot): void;
 }
 
 export const useLifeStore = create<LifeState>((set, get) => ({
@@ -161,6 +163,33 @@ export const useLifeStore = create<LifeState>((set, get) => ({
     const ch = Math.max(10, Math.min(MAX_DIM, h));
     _engine = _engine.resize(cw, ch);
     set({ width: cw, height: ch, renderTick: get().renderTick + 1 });
+  },
+
+  loadSnapshot: (snap) => {
+    const cw = Math.max(10, Math.min(MAX_DIM, snap.w));
+    const ch = Math.max(10, Math.min(MAX_DIM, snap.h));
+    if (_engine.width !== cw || _engine.height !== ch) {
+      _engine = new GameOfLifeEngine(cw, ch);
+    } else {
+      _engine.clear();
+    }
+    for (const idx of snap.cells) {
+      const row = Math.floor(idx / cw);
+      const col = idx % cw;
+      _engine.setCell(row, col, true);
+    }
+    const population = _engine.getPopulation();
+    set({
+      width: cw,
+      height: ch,
+      generation: snap.gen,
+      population,
+      births: 0,
+      deaths: 0,
+      running: false,
+      history: [],
+      renderTick: get().renderTick + 1,
+    });
   },
 
   fitToScreen: (canvasW, canvasH) => {

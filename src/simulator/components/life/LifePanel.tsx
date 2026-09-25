@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLifeStore } from "../../life/store.ts";
 import { PATTERNS, PATTERN_CATEGORIES, CATEGORY_LABELS, PATTERN_BY_ID, type PatternCategory } from "../../life/patterns.ts";
 import { PopGraph } from "./PopGraph.tsx";
+import { LifeSharePanel } from "./LifeSharePanel.tsx";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -185,6 +186,11 @@ export function LifePanel() {
             </div>
           </div>
         ))}
+      </Section>
+
+      {/* Share / Save */}
+      <Section title="Compartir / Guardar">
+        <LifeSharePanel />
       </Section>
 
       {/* About */}

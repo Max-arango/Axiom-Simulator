@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLifeStore } from "../../life/store.ts";
+import { readHashSnapshot } from "../../life/snapshot.ts";
 import { LifePanel } from "./LifePanel.tsx";
 import { LifeCanvas } from "./LifeCanvas.tsx";
 
@@ -37,12 +38,17 @@ export function LifeView() {
   useLifeDriver();
   useLifeKeys();
 
-  // Auto-randomize once when the workspace first mounts.
+  // On first mount: load from URL hash if present, otherwise randomize.
   const initialized = useRef(false);
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
-    useLifeStore.getState().randomize();
+    const snap = readHashSnapshot();
+    if (snap) {
+      useLifeStore.getState().loadSnapshot(snap);
+    } else {
+      useLifeStore.getState().randomize();
+    }
   }, []);
 
   return (
