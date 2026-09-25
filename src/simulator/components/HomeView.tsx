@@ -131,6 +131,24 @@ const WORKSPACES: Workspace[] = [
     ),
   },
   {
+    id: "life",
+    name: "Game of Life",
+    blurb: "Conway's cellular automaton.",
+    glyph: () => (
+      <G>
+        <rect x="14" y="14" width="8" height="8" fill={V} opacity="0.9" rx="1" />
+        <rect x="26" y="14" width="8" height="8" fill={V} opacity="0.9" rx="1" />
+        <rect x="14" y="26" width="8" height="8" fill={V} opacity="0.25" rx="1" />
+        <rect x="26" y="26" width="8" height="8" fill={V} opacity="0.9" rx="1" />
+        <rect x="38" y="14" width="8" height="8" fill={V} opacity="0.25" rx="1" />
+        <rect x="38" y="26" width="8" height="8" fill={V} opacity="0.9" rx="1" />
+        <rect x="14" y="38" width="8" height="8" fill={V} opacity="0.9" rx="1" />
+        <rect x="26" y="38" width="8" height="8" fill={V} opacity="0.25" rx="1" />
+        <rect x="38" y="38" width="8" height="8" fill={V} opacity="0.9" rx="1" />
+      </G>
+    ),
+  },
+  {
     id: "dynamics3d",
     name: "Dynamics 3D",
     blurb: "Gravity, orbits & spacetime.",

@@ -17,6 +17,7 @@ const Dynamics3DView = lazy(() => import("./components/dynamics3d/Dynamics3DView
 const InspectorView = lazy(() => import("./components/inspector/InspectorView.tsx").then((m) => ({ default: m.InspectorView })));
 const NotebookView = lazy(() => import("./components/notebook/NotebookView.tsx").then((m) => ({ default: m.NotebookView })));
 const QuantumLabView = lazy(() => import("./components/quantum/QuantumLabView.tsx").then((m) => ({ default: m.QuantumLabView })));
+const LifeView = lazy(() => import("./components/life/LifeView.tsx").then((m) => ({ default: m.LifeView })));
 
 /** Drives parameter animation; animTick no-ops (no set) while paused. */
 function useAnimDriver() {
@@ -99,6 +100,7 @@ function ModeNav() {
     { id: "topo", label: "Topology" },
     { id: "dynamics", label: "Dynamics" },
     { id: "dynamics3d", label: "Dynamics 3D" },
+    { id: "life", label: "Game of Life" },
     { id: "inspector", label: "Inspector" },
     { id: "notebook", label: "Notebook" },
     { id: "docs", label: "Docs" },
@@ -159,6 +161,10 @@ export function App() {
       ) : appMode === "dynamics3d" ? (
         <Suspense fallback={<div className="p-8 text-sm text-stone-500">Loading…</div>}>
           <Dynamics3DView />
+        </Suspense>
+      ) : appMode === "life" ? (
+        <Suspense fallback={<div className="p-8 text-sm text-stone-500">Loading…</div>}>
+          <LifeView />
         </Suspense>
       ) : appMode === "inspector" ? (
         <Suspense fallback={<div className="p-8 text-sm text-stone-500">Loading…</div>}>

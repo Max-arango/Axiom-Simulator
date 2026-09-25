@@ -30,6 +30,7 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { id: "ws-dynamics3d", kind: "workspace", title: "Dynamics 3D", keywords: ["dynamics 3d", "gravity", "n-body", "mathematical field", "general relativity", "schwarzschild", "kerr", "black hole", "geodesic", "frame dragging"], route: "dynamics3d" },
   { id: "ws-inspector", kind: "workspace", title: "Inspector", keywords: ["inspect", "analyze", "properties", "invariants", "compare"], route: "inspector" },
   { id: "ws-notebook", kind: "workspace", title: "Notebook", keywords: ["experiment", "notebook", "reproducib", "cell", "serialize"], route: "notebook" },
+  { id: "ws-life", kind: "workspace", title: "Game of Life", keywords: ["game of life", "conway", "cellular automaton", "automata", "glider", "blinker", "oscillator", "spaceship", "pattern", "emergence", "life"], route: "life" },
 
   // ── Documentation sections (ids match content.ts) ───────────────────────────
   { id: "doc-linear", kind: "doc", title: "Linear Algebra", keywords: ["matrix", "vector", "eigenvalue", "eigenvector", "svd", "decomposition", "lu", "qr", "cholesky", "least squares", "determinant", "nullspace", "rank", "basis"], route: "linear-algebra" },
