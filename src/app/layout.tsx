@@ -101,11 +101,9 @@ export const metadata: Metadata = {
   },
   category: "science",
   verification: {
-    // Paste your Google Search Console HTML-tag token here after verifying:
-    // google: process.env.GOOGLE_SITE_VERIFICATION,
+    google: "9ac72867bfeeb039",
     other: {
-      // Paste your Bing Webmaster Tools verification code here:
-      // "msvalidate.01": process.env.BING_SITE_VERIFICATION ?? "",
+      "msvalidate.01": "3DC54E96FB2125ACE316E098C9DAA5DF",
     },
   },
 };
