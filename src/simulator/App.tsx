@@ -10,6 +10,7 @@ import { searchMath, type SearchEntry } from "./search/mathSearch.ts";
 import { LogoMark } from "./components/Logo.tsx";
 import { HomeView } from "./components/HomeView.tsx";
 import { FractalWorkspace } from "./components/fractal/FractalWorkspace.tsx";
+import { navigateTo, SEGMENT_TO_MODE } from "./routes.ts";
 
 // KaTeX-heavy views are lazy-loaded to keep the initial bundle lean.
 const DocsView = lazy(() => import("./components/docs/DocsView.tsx").then((m) => ({ default: m.DocsView })));
@@ -35,8 +36,30 @@ function useAnimDriver() {
   }, []);
 }
 
+/** Sync appMode with the browser URL (pushState on navigate, popstate on back). */
+function useUrlSync(initialMode?: AppMode) {
+  useEffect(() => {
+    // Set mode from the page prop (direct URL access or landing card click).
+    if (initialMode) {
+      useStore.getState().setAppMode(initialMode);
+    } else {
+      // Fallback: read pathname in case no prop was passed.
+      const seg = window.location.pathname.replace(/^\/simulator\/?/, "");
+      const mode = SEGMENT_TO_MODE[seg];
+      if (mode) useStore.getState().setAppMode(mode);
+    }
+
+    // Handle browser back/forward within the simulator.
+    const onPop = () => {
+      const seg = window.location.pathname.replace(/^\/simulator\/?/, "");
+      useStore.getState().setAppMode(SEGMENT_TO_MODE[seg] ?? "home");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 function MathSearch() {
-  const setAppMode = useStore((s) => s.setAppMode);
   const loadExample = useNotebook((s) => s.loadExample);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -47,16 +70,15 @@ function MathSearch() {
     setQuery("");
     setOpen(false);
     if (e.kind === "workspace") {
-      setAppMode(e.route as AppMode);
+      navigateTo(e.route as AppMode);
     } else if (e.kind === "doc") {
-      setAppMode("docs");
-      // Scroll after the lazy DocsView mounts.
+      navigateTo("docs");
       setTimeout(() => document.getElementById(`doc-${e.route}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } else if (e.kind === "example") {
-      setAppMode("notebook");
+      navigateTo("notebook");
       setTimeout(() => loadExample(e.route), 0);
     } else {
-      setAppMode("inspector");
+      navigateTo("inspector");
     }
   };
 
@@ -90,7 +112,6 @@ function MathSearch() {
 
 function ModeNav() {
   const appMode = useStore((s) => s.appMode);
-  const setAppMode = useStore((s) => s.setAppMode);
   const tabs: { id: AppMode; label: string }[] = [
     { id: "calculator", label: "Calculator" },
     { id: "fractal", label: "Fractal Lab" },
@@ -108,7 +129,7 @@ function ModeNav() {
   return (
     <div className="graph-paper flex items-center gap-1 overflow-x-auto border-b border-line bg-void px-3 py-2 scroll-thin">
       <button
-        onClick={() => setAppMode("home")}
+        onClick={() => navigateTo("home" as AppMode)}
         title="Back to workspaces"
         className="focusable mr-3 flex shrink-0 items-center gap-2 rounded-sm text-ink transition-opacity hover:opacity-80"
       >
@@ -120,7 +141,7 @@ function ModeNav() {
       {tabs.map((t) => (
         <button
           key={t.id}
-          onClick={() => setAppMode(t.id)}
+          onClick={() => navigateTo(t.id)}
           className={`shrink-0 rounded-sm px-3 py-1 text-xs font-medium transition ${
             appMode === t.id
               ? "bg-vermilion-500/15 text-vermilion-200 ring-1 ring-vermilion-400/40"
@@ -135,8 +156,13 @@ function ModeNav() {
   );
 }
 
-export function App() {
+interface AppProps {
+  initialMode?: AppMode;
+}
+
+export function App({ initialMode }: AppProps) {
   useAnimDriver();
+  useUrlSync(initialMode);
   const appMode = useStore((s) => s.appMode);
 
   if (appMode === "home") return <HomeView />;

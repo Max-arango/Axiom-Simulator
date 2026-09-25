@@ -35,7 +35,7 @@ export function WorkspacesSection() {
             return (
               <Reveal key={ws.id} delay={(i % 3) * 70}>
                 <Link
-                  href={SITE.simulatorPath}
+                  href={`${SITE.simulatorPath}${ws.route}`}
                   className="group focusable block overflow-hidden rounded-lg border border-line bg-card shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-lg"
                 >
                   <div

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useStore, type AppMode } from "../store.ts";
 import { useNotebook } from "../experiment/notebookStore.ts";
 import { searchMath, type SearchEntry } from "../search/mathSearch.ts";
+import { navigateTo } from "../routes.ts";
 import { LogoMark } from "./Logo.tsx";
 
 /**
@@ -209,7 +210,6 @@ const KIND_LABEL: Record<SearchEntry["kind"], string> = {
 };
 
 export function HomeView() {
-  const setAppMode = useStore((s) => s.setAppMode);
   const loadExample = useNotebook((s) => s.loadExample);
   const [query, setQuery] = useState("");
   const hits = useMemo(() => (query.trim() ? searchMath(query).slice(0, 7) : []), [query]);
@@ -217,15 +217,15 @@ export function HomeView() {
   const go = (e: SearchEntry) => {
     setQuery("");
     if (e.kind === "workspace") {
-      setAppMode(e.route as AppMode);
+      navigateTo(e.route as AppMode);
     } else if (e.kind === "doc") {
-      setAppMode("docs");
+      navigateTo("docs");
       setTimeout(() => document.getElementById(`doc-${e.route}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } else if (e.kind === "example") {
-      setAppMode("notebook");
+      navigateTo("notebook");
       setTimeout(() => loadExample(e.route), 0);
     } else {
-      setAppMode("inspector");
+      navigateTo("inspector");
     }
   };
 
@@ -285,7 +285,7 @@ export function HomeView() {
           {WORKSPACES.map((ws, i) => (
             <button
               key={ws.id}
-              onClick={() => setAppMode(ws.id)}
+              onClick={() => navigateTo(ws.id)}
               style={{ animationDelay: `${60 + i * 30}ms` }}
               className="fade-up group focusable flex items-center gap-4 rounded-xl border border-line bg-void-soft p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-vermilion-400/40 hover:bg-vermilion-500/[0.05]"
             >
