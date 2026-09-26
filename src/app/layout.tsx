@@ -139,12 +139,18 @@ const jsonLd = {
   },
   author: {
     "@type": "Person",
-    name: "Max-arango",
+    name: "Maximiliano Arango",
     url: "https://github.com/Max-arango",
+    sameAs: [
+      "https://github.com/Max-arango",
+      "https://www.linkedin.com/in/maximiliano-arango-acosta-544307434/",
+      "https://www.instagram.com/maxx.linux",
+    ],
+    email: "fellcrack@protonmail.com",
   },
   creator: {
     "@type": "Person",
-    name: "Max-arango",
+    name: "Maximiliano Arango",
     url: "https://github.com/Max-arango",
   },
   codeRepository: "https://github.com/Max-arango/Axiom-Simulator",

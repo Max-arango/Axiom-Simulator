@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 const UPDATED = "25 de septiembre de 2026";
-const CONTACT = "ma@urpeailab.com";
+const CONTACT = "fellcrack@protonmail.com";
 const SITE = "https://axiom-simulator.vercel.app";
 
 export default function PrivacidadPage() {

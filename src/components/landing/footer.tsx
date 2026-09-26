@@ -1,4 +1,4 @@
-import { Github, ArrowUpRight, BookOpen } from "lucide-react";
+import { Github, ArrowUpRight, BookOpen, Linkedin, Instagram, Mail } from "lucide-react";
 import { Logo } from "@/components/landing/logo";
 import { SITE } from "@/lib/site";
 
@@ -6,6 +6,13 @@ const PROJECT_LINKS = [
   { label: "GitHub", href: SITE.github, external: true, icon: Github },
   { label: "Simulator", href: SITE.simulatorPath, external: false, icon: ArrowUpRight },
   { label: "Docs", href: SITE.github, external: true, icon: BookOpen },
+] as const;
+
+const AUTHOR_LINKS = [
+  { label: "LinkedIn", href: SITE.linkedin, external: true, icon: Linkedin },
+  { label: "Instagram", href: SITE.instagram, external: true, icon: Instagram },
+  { label: "GitHub", href: `https://github.com/Max-arango`, external: true, icon: Github },
+  { label: "Contacto", href: `mailto:${SITE.email}`, external: false, icon: Mail },
 ] as const;
 
 const PAGE_LINKS = [
@@ -27,7 +34,7 @@ export function Footer() {
   return (
     <footer className="mt-auto border-t border-line bg-paper">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="grid gap-10 py-12 md:grid-cols-[1.5fr,1fr,1fr,1fr] md:gap-8">
+        <div className="grid gap-10 py-12 md:grid-cols-[1.5fr,1fr,1fr,1fr,1fr] md:gap-8">
           <div className="max-w-sm">
             <Logo />
             <p className="mt-4 text-sm leading-relaxed text-graphite">
@@ -84,6 +91,26 @@ export function Footer() {
                     href={link.href}
                     className="focusable rounded-sm text-sm font-medium text-ink/80 transition-colors hover:text-vermilion"
                   >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <nav aria-label="Autor">
+            <h3 className="mono-label text-graphite">Autor</h3>
+            <ul className="mt-4 space-y-2.5">
+              {AUTHOR_LINKS.map((link) => (
+                <li key={link.label}>
+                  <a
+                    href={link.href}
+                    {...(link.external
+                      ? { target: "_blank", rel: "noopener noreferrer" }
+                      : {})}
+                    className="focusable inline-flex items-center gap-2 rounded-sm text-sm font-medium text-ink/80 transition-colors hover:text-vermilion"
+                  >
+                    <link.icon className="size-3.5 text-graphite" aria-hidden="true" />
                     {link.label}
                   </a>
                 </li>
