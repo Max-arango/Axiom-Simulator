@@ -10,6 +10,7 @@ import { searchMath, type SearchEntry } from "./search/mathSearch.ts";
 import { LogoMark } from "./components/Logo.tsx";
 import { HomeView } from "./components/HomeView.tsx";
 import { FractalWorkspace } from "./components/fractal/FractalWorkspace.tsx";
+import { ThermalWorkspace } from "./components/thermal/ThermalWorkspace.tsx";
 import { navigateTo, SEGMENT_TO_MODE } from "./routes.ts";
 
 // KaTeX-heavy views are lazy-loaded to keep the initial bundle lean.
@@ -125,6 +126,7 @@ function ModeNav() {
     { id: "inspector", label: "Inspector" },
     { id: "notebook", label: "Notebook" },
     { id: "docs", label: "Docs" },
+    { id: "thermal", label: "Thermal Lab" },
   ];
   return (
     <div className="graph-paper flex items-center gap-1 overflow-x-auto border-b border-line bg-void px-3 py-2 scroll-thin">
@@ -204,6 +206,8 @@ export function App({ initialMode }: AppProps) {
         <Suspense fallback={<div className="p-8 text-sm text-stone-500">Loading…</div>}>
           <DocsView />
         </Suspense>
+      ) : appMode === "thermal" ? (
+        <ThermalWorkspace />
       ) : (
         <FractalWorkspace />
       )}
