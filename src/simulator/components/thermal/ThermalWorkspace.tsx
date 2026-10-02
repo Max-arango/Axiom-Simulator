@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { CanvasControls } from "../CanvasControls.tsx";
-import { heat2d } from "../../mathlab/pde/heat2d.ts";
-import type { Heat2DParams, Heat2DResult } from "../../mathlab/pde/heat2d.ts";
-import { buildGrid } from "../../mathlab/pde/grid.ts";
+import { heat2d } from "@/simulator/mathlab/pde/heat2d.ts";
+import type { Heat2DParams, Heat2DResult } from "@/simulator/mathlab/pde/heat2d.ts";
+import { buildGrid } from "@/simulator/mathlab/pde/grid.ts";
 
 const defaultSimParams: Heat2DParams = {
   gridX: { min: -5, max: 5, steps: 50 },
