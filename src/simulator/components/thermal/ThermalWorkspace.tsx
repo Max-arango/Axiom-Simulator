@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { CanvasControls } from "../CanvasControls.tsx";
+import { CanvasControls } from "@/simulator/components/CanvasControls.tsx";
 import { heat2d } from "@/simulator/mathlab/pde/heat2d.ts";
 import type { Heat2DParams, Heat2DResult } from "@/simulator/mathlab/pde/heat2d.ts";
 import { buildGrid } from "@/simulator/mathlab/pde/grid.ts";
