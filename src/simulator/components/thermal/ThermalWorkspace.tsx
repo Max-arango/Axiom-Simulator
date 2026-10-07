@@ -3,13 +3,35 @@ import { CanvasControls } from "@/simulator/components/CanvasControls.tsx";
 import { heat2d } from "@/simulator/mathlab/pde/heat2d.ts";
 import type { Heat2DParams, Heat2DResult } from "@/simulator/mathlab/pde/heat2d.ts";
 import { buildGrid } from "@/simulator/mathlab/pde/grid.ts";
+import type { Grid1D } from "@/simulator/mathlab/pde/types.ts";
+import { NumericalInstabilityError, InvalidInputError, ResourceLimitError } from "@/simulator/mathlab/core/errors.ts";
+
+function makeGrid1D(xMin: number, xMax: number, nx: number): Grid1D {
+  return { xMin, xMax, nx };
+}
+
+function computeMaxStableDt(gridX: Grid1D, gridY: Grid1D, alpha: number): number {
+  const x = buildGrid(gridX);
+  const y = buildGrid(gridY);
+  const dx = x[1] - x[0];
+  const dy = y[1] - y[0];
+  // FTCS stability: rx + ry = alpha * dt * (1/dx^2 + 1/dy^2) <= 0.5
+  // dt <= 0.5 / (alpha * (1/dx^2 + 1/dy^2))
+  return 0.5 / (alpha * (1 / (dx * dx) + 1 / (dy * dy)));
+}
+
+const DEFAULT_GRID_X: Grid1D = makeGrid1D(-5, 5, 50);
+const DEFAULT_GRID_Y: Grid1D = makeGrid1D(-5, 5, 50);
+const DEFAULT_ALPHA = 0.5;
+const DEFAULT_DT = computeMaxStableDt(DEFAULT_GRID_X, DEFAULT_GRID_Y, DEFAULT_ALPHA) * 0.8; // 80% of stability limit for safety margin
+const DEFAULT_STEPS = 50;
 
 const defaultSimParams: Heat2DParams = {
-  gridX: { min: -5, max: 5, steps: 50 },
-  gridY: { min: -5, max: 5, steps: 50 },
-  alpha: 0.5,
-  dt: 0.1,
-  steps: 10,
+  gridX: DEFAULT_GRID_X,
+  gridY: DEFAULT_GRID_Y,
+  alpha: DEFAULT_ALPHA,
+  dt: DEFAULT_DT,
+  steps: DEFAULT_STEPS,
   initial: (x: number, y: number) => {
     // Initial condition: a hot spot at the center
     const r = Math.sqrt(x * x + y * y);
@@ -32,8 +54,9 @@ export function ThermalWorkspace() {
   const [uiHidden, setUiHidden] = useState(false);
   const [simParams, setSimParams] = useState<Heat2DParams>(defaultSimParams);
   const [playing, setPlaying] = useState(false);
+  const [currentTimeIndex, setCurrentTimeIndex] = useState(0);
 
-  // Memoize simulation result to avoid setState in effect
+  // Memoize simulation result (no side effects)
   const simulationData = useMemo(() => {
     try {
       const res = heat2d(simParams);
@@ -54,34 +77,44 @@ export function ThermalWorkspace() {
       }
       return {
         result: res,
-        currentTimeIndex: res.t.length - 1,
         globalMin,
-        globalMax
+        globalMax,
+        error: null as Error | null
       };
     } catch (e) {
-      console.error("Simulation error:", e);
+      const err = e as Error;
       return {
-        result: null,
-        currentTimeIndex: 0,
+        result: null as Heat2DResult | null,
         globalMin: 0,
-        globalMax: 1
+        globalMax: 1,
+        error: err
       };
     }
   }, [simParams]);
 
-  const { result, currentTimeIndex, globalMin, globalMax } = simulationData;
+  const { result, globalMin, globalMax, error } = simulationData;
 
-  // Animation controls for time using ref to avoid setState in effect
+  // Use error directly from memo - no separate state needed
+  const simulationError = error;
+
+  // Clamp currentTimeIndex when result changes (e.g., steps changed)
+  // Derived during render to avoid setState in effect
+  const clampedTimeIndex = result
+    ? Math.min(currentTimeIndex, result.t.length - 1)
+    : 0;
+
+  // Animation controls for time
   const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!playing || !result) return;
     const step = () => {
       setCurrentTimeIndex((prev) => {
-        const next = prev + 1;
+        const clampedPrev = Math.min(prev, result.t.length - 1);
+        const next = clampedPrev + 1;
         if (next >= result.t.length) {
           setPlaying(false);
-          return 0;
+          return result.t.length - 1; // Stay on last frame
         }
         return next;
       });
@@ -103,14 +136,11 @@ export function ThermalWorkspace() {
       if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
       if (e.key === " ") {
         e.preventDefault();
-        setPlaying(!playing);
+        setPlaying((p) => !p);
       } else if (e.key === "ArrowRight" && result) {
-        setCurrentTimeIndex((prev) => (prev + 1) % result.t.length);
+        setCurrentTimeIndex((prev) => Math.min(Math.min(prev, result.t.length - 1) + 1, result.t.length - 1));
       } else if (e.key === "ArrowLeft" && result) {
-        setCurrentTimeIndex((prev) => {
-          const prevIdx = (prev - 1 + result.t.length) % result.t.length;
-          return prevIdx;
-        });
+        setCurrentTimeIndex((prev) => Math.max(Math.min(prev, result.t.length - 1) - 1, 0));
       } else if (e.key === "Escape") {
         setUiHidden(false);
       } else if (e.key === "h" || e.key === "H") {
@@ -119,21 +149,29 @@ export function ThermalWorkspace() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [playing, result]);
+  }, [result]);
+
+  // Handler for parameter updates that accepts both direct values and updater functions
+  const handleParamsChange = useCallback(
+    (update: Heat2DParams | ((prev: Heat2DParams) => Heat2DParams)) => {
+      setSimParams(update);
+      // Reset time index when parameters change
+      setCurrentTimeIndex(0);
+      // Stop playback when parameters change
+      setPlaying(false);
+    },
+    []
+  );
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
-      {/* Thermal Canvas - we'll create a simple div for now */}
-      <div
-        className="absolute inset-0 flex items-center justify-center bg-gray-900"
-        style={{ width: "100%", height: "100%" }}
-      >
-        {result ? (
+      <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+        {simulationError ? (
+          <SimulationErrorDisplay error={simulationError} />
+        ) : result ? (
           <ThermalCanvas
             result={result}
-            timeIndex={currentTimeIndex}
-            width={800}
-            height={600}
+            timeIndex={clampedTimeIndex}
             globalMin={globalMin}
             globalMax={globalMax}
           />
@@ -149,19 +187,19 @@ export function ThermalWorkspace() {
           <ThermalToolbar
             simParams={simParams}
             result={result}
-            currentTimeIndex={currentTimeIndex}
+            currentTimeIndex={clampedTimeIndex}
             playing={playing}
-            onPlayPause={() => setPlaying(!playing)}
+            onPlayPause={() => setPlaying((p) => !p)}
             onResetTime={() => setCurrentTimeIndex(0)}
-            onSimulationParamsChange={setSimParams}
+            onSimulationParamsChange={handleParamsChange}
             defaultSimParams={defaultSimParams}
+            simulationError={simulationError}
           />
 
-          {/* Panel for detailed controls */}
           <div className="absolute bottom-3 left-3 top-[68px] z-20 w-[300px]">
             <ThermalPanel
               simParams={simParams}
-              onChange={setSimParams}
+              onChange={handleParamsChange}
             />
           </div>
 
@@ -184,48 +222,102 @@ export function ThermalWorkspace() {
   );
 }
 
+function SimulationErrorDisplay({ error }: { error: Error }) {
+  let message = error.message;
+  let detail = "";
+
+  if (error instanceof NumericalInstabilityError) {
+    message = "Numerical instability";
+    detail = "FTCS requires: rx + ry ≤ 0.5\n\n" + error.message;
+  } else if (error instanceof InvalidInputError) {
+    message = "Invalid input";
+    detail = error.message;
+  } else if (error instanceof ResourceLimitError) {
+    message = "Resource limit exceeded";
+    detail = error.message;
+  }
+
+  return (
+    <div className="text-white text-center p-4 max-w-md mx-auto">
+      <div className="text-lg font-semibold text-red-400 mb-2">{message}</div>
+      <pre className="text-xs text-stone-300 text-left bg-stone-900/50 p-3 rounded overflow-auto">{detail}</pre>
+    </div>
+  );
+}
+
 /**
  * Simple canvas to render the heat distribution as a color map.
  */
 function ThermalCanvas({
   result,
   timeIndex,
-  width,
-  height,
   globalMin,
   globalMax,
 }: {
   result: Heat2DResult;
   timeIndex: number;
-  width: number;
-  height: number;
   globalMin: number;
   globalMax: number;
 }) {
-  const [canvasRef, setCanvasRef] = useState<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
+  // Handle responsive canvas sizing
   useEffect(() => {
-    if (!canvasRef) return;
-    const ctx = canvasRef.getContext("2d");
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const resize = () => {
+      const parent = canvas.parentElement;
+      if (parent) {
+        const rect = parent.getBoundingClientRect();
+        const width = Math.floor(rect.width);
+        const height = Math.floor(rect.height);
+        if (width > 0 && height > 0 && (canvas.width !== width || canvas.height !== height)) {
+          canvas.width = width;
+          canvas.height = height;
+          setCanvasSize({ width, height });
+        }
+      }
+    };
+
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas.parentElement!);
+    return () => observer.disconnect();
+  }, []);
+
+  // Render the heatmap
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const { x, y, u } = result;
     const nx = x.length;
     const ny = y.length;
+
+    // Validate timeIndex bounds
+    if (timeIndex < 0 || timeIndex >= u.length) return;
     const tempSlice = u[timeIndex];
 
     // Use precomputed global min and max for coloring
     const range = globalMax - globalMin;
+    const epsilon = 1e-12;
     const getColor = (value: number) => {
-      // Map value to 0-1 range
-      let t = (value - globalMin) / range;
-      if (isNaN(t)) t = 0;
+      // Map value to 0-1 range with robust handling of zero range
+      let t = range > epsilon ? (value - globalMin) / range : 0.5;
+      if (isNaN(t)) t = 0.5;
       t = Math.max(0, Math.min(1, t));
       // Blue cold -> red hot
       const r = Math.round(255 * t);
       const b = Math.round(255 * (1 - t));
       return `rgb(${r},0,${b})`;
     };
+
+    const width = canvas.width;
+    const height = canvas.height;
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -260,14 +352,13 @@ function ThermalCanvas({
       ctx.lineTo(width, j * cellHeight);
       ctx.stroke();
     }
-  }, [result, timeIndex, width, height, canvasRef, globalMin, globalMax]);
+  }, [result, timeIndex, globalMin, globalMax, canvasSize]);
 
   return (
     <canvas
-      ref={setCanvasRef}
-      width={width}
-      height={height}
-      className="border border-white/20"
+      ref={canvasRef}
+      className="w-full h-full border border-white/20"
+      style={{ width: "100%", height: "100%" }}
     />
   );
 }
@@ -284,6 +375,7 @@ function ThermalToolbar({
   onResetTime,
   onSimulationParamsChange,
   defaultSimParams,
+  simulationError,
 }: {
   simParams: Heat2DParams;
   result: Heat2DResult | null;
@@ -291,8 +383,9 @@ function ThermalToolbar({
   playing: boolean;
   onPlayPause: () => void;
   onResetTime: () => void;
-  onSimulationParamsChange: (params: Heat2DParams) => void;
+  onSimulationParamsChange: (update: Heat2DParams | ((prev: Heat2DParams) => Heat2DParams)) => void;
   defaultSimParams: Heat2DParams;
+  simulationError: Error | null;
 }) {
   const handleAlphaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
@@ -317,6 +410,9 @@ function ThermalToolbar({
     }
   };
 
+  const maxStableDt = computeMaxStableDt(simParams.gridX, simParams.gridY, simParams.alpha);
+  const stabilityRatio = simParams.dt / maxStableDt;
+
   return (
     <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap gap-2 items-end">
       <div className="flex flex-col gap-1">
@@ -335,20 +431,23 @@ function ThermalToolbar({
         <label className="text-xs text-graphite">dt</label>
         <input
           type="number"
-          min={0.001}
+          min={0.0001}
           max={1}
-          step={0.001}
+          step={0.0001}
           value={simParams.dt}
           onChange={handleDtChange}
           className="w-20 rounded border border-line bg-white/20 text-xs text-white focus:border-vermilion-400 focus:ring-vermilion-400"
         />
+        <div className="text-[10px] text-stone-500">
+          Max stable: {maxStableDt.toExponential(2)}
+        </div>
       </div>
       <div className="flex flex-col gap-1">
         <label className="text-xs text-graphite">Steps</label>
         <input
           type="number"
           min={1}
-          max={100}
+          max={200}
           step={1}
           value={simParams.steps}
           onChange={handleStepsChange}
@@ -358,13 +457,15 @@ function ThermalToolbar({
       <div className="flex flex-col gap-1">
         <button
           onClick={onPlayPause}
-          className="flex size-9 items-center justify-center rounded-lg border border-line bg-void-soft/80 text-[17px] leading-none text-ink shadow-lg backdrop-blur-md transition hover:border-vermilion-400/50 hover:text-vermilion-200"
+          disabled={!result || simulationError !== null}
+          className="flex size-9 items-center justify-center rounded-lg border border-line bg-void-soft/80 text-[17px] leading-none text-ink shadow-lg backdrop-blur-md transition hover:border-vermilion-400/50 hover:text-vermilion-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {playing ? "❚❚" : "▶"}
         </button>
         <button
           onClick={onResetTime}
-          className="flex size-9 items-center justify-center rounded-lg border border-line bg-void-soft/80 text-[17px] leading-none text-ink shadow-lg backdrop-blur-md transition hover:border-vermilion-400/50 hover:text-vermilion-200"
+          disabled={!result}
+          className="flex size-9 items-center justify-center rounded-lg border border-line bg-void-soft/80 text-[17px] leading-none text-ink shadow-lg backdrop-blur-md transition hover:border-vermilion-400/50 hover:text-vermilion-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           ⟲
         </button>
@@ -380,6 +481,9 @@ function ThermalToolbar({
         <div className="flex flex-col gap-1 text-xs text-graphite">
           <div>Time: {result.t[currentTimeIndex].toFixed(3)} s</div>
           <div>Step: {currentTimeIndex + 1}/{result.t.length}</div>
+          <div className={stabilityRatio > 0.95 ? "text-yellow-400" : "text-green-400"}>
+            rx+ry: {result.stabilityNumber.toFixed(3)} {stabilityRatio > 0.95 ? "(near limit)" : "(stable)"}
+          </div>
         </div>
       )}
     </div>
@@ -396,7 +500,7 @@ function ThermalPanel({
   onChange,
 }: {
   simParams: Heat2DParams;
-  onChange: (params: Heat2DParams) => void;
+  onChange: (update: Heat2DParams | ((prev: Heat2DParams) => Heat2DParams)) => void;
 }) {
   const [initialPreset, setInitialPreset] = useState<'hot-center' | 'hot-edge' | 'uniform'>('hot-center');
 
@@ -413,8 +517,8 @@ function ThermalPanel({
         break;
       case 'hot-edge':
         initialFn = (x: number, y: number) => {
-          const maxX = simParams.gridX.max;
-          const maxY = simParams.gridY.max;
+          const maxX = simParams.gridX.xMax;
+          const maxY = simParams.gridY.xMax;
           const dx = Math.abs(x) / maxX;
           const dy = Math.abs(y) / maxY;
           return Math.max(dx, dy);
@@ -431,7 +535,7 @@ function ThermalPanel({
     const value = parseInt(e.target.value, 10);
     onChange((prev) => ({
       ...prev,
-      gridX: { ...prev.gridX, steps: value },
+      gridX: { ...prev.gridX, nx: value },
     }));
   };
 
@@ -439,7 +543,7 @@ function ThermalPanel({
     const value = parseInt(e.target.value, 10);
     onChange((prev) => ({
       ...prev,
-      gridY: { ...prev.gridY, steps: value },
+      gridY: { ...prev.gridY, nx: value },
     }));
   };
 
@@ -454,7 +558,7 @@ function ThermalPanel({
             min={10}
             max={200}
             step={1}
-            value={simParams.gridX.steps}
+            value={simParams.gridX.nx}
             onChange={handleGridXChange}
             className="w-16 rounded border border-line bg-white/20 text-xs text-white focus:border-vermilion-400 focus:ring-vermilion-400"
           /> ×{" "}
@@ -463,7 +567,7 @@ function ThermalPanel({
             min={10}
             max={200}
             step={1}
-            value={simParams.gridY.steps}
+            value={simParams.gridY.nx}
             onChange={handleGridYChange}
             className="w-16 rounded border border-line bg-white/20 text-xs text-white focus:border-vermilion-400 focus:ring-vermilion-400"
           />
@@ -471,11 +575,11 @@ function ThermalPanel({
         <div>
           <label className="mr-2">Domain:</label>
           <span>
-            X: [{simParams.gridX.min}, {simParams.gridX.max}]
+            X: [{simParams.gridX.xMin}, {simParams.gridX.xMax}]
           </span>
           <br />
           <span>
-            Y: [{simParams.gridY.min}, {simParams.gridY.max}]
+            Y: [{simParams.gridY.xMin}, {simParams.gridY.xMax}]
           </span>
         </div>
         <div>
