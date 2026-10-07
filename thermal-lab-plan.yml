@@ -1,0 +1,67 @@
+task_id: THERMAL-LAB-001
+from_agent: planner
+to_agent: orchestrator
+status: PLAN_READY
+summary: Create Thermal Lab workspace for 2D heat equation simulation with interactive controls
+what: Create a new "Thermal Lab" workspace for simulating heat diffusion (2D heat equation) with interactive controls for thermal diffusivity, boundary conditions, and initial conditions
+why: To extend Axiom's simulation capabilities to include thermal physics, complementing existing mathematical and scientific workspaces
+how: 
+  - Add "thermal" to workspace metadata in /app/simulator/[workspace]/page.tsx
+  - Add "thermal" to SEGMENT_TO_MODE and MODE_TO_SEGMENT in /simulator/routes.ts
+  - Add "thermal" to AppMode union type in /simulator/store.ts
+  - Create 2D heat equation solver in /simulator/mathlab/pde/heat2d.ts
+  - Create ThermalWorkspace component in /simulator/components/thermal/ThermalWorkspace.tsx
+  - Add thermal view to App component switch statement in /simulator/App.tsx
+  - Create basic controls for simulation parameters
+where:
+  - Routes: /simulator/thermal (maps to AppMode "thermal")
+  - Source: /simulator/components/thermal/
+  - Math: /simulator/mathlab/pde/heat2d.ts
+  - UI: Reuses existing WorkspaceShell and CanvasControls patterns
+risks:
+  - Numerical stability: 2D explicit heat equation has stricter stability condition (r ≤ 1/4) than 1D
+  - Performance: 2D simulations are more computationally intensive than 1D
+  - Complexity: Managing 2D state and WebGL rendering adds complexity
+dependencies:
+  - Existing mathlab/pde/grid.ts for grid utilities
+  - Existing mathlab/pde/types.ts for result interfaces
+  - Existing simulator/components/workspace/WorkspaceShell.tsx
+  - Existing simulator/components/fractal/FractalCanvas.tsx (for WebGL rendering pattern)
+  - Existing Zustand store for state management
+tests:
+  - Unit tests for heat2d solver (similar to heat1d.test.ts)
+  - Integration test verifying workspace loads and routes correctly
+  - Visual regression test for basic heat diffusion visualization
+  - Test numerical stability boundary conditions
+security:
+  - No special security gates required (security_required: false)
+  - No sensitive data handling
+  - No external API calls
+  - Content is purely computational/visualizational
+acceptance_criteria:
+  - Navigating to /simulator/thermal loads the Thermal Lab workspace
+  - Workspace shows a canvas with heat diffusion visualization
+  - Controls allow adjusting thermal diffusivity (alpha) parameter
+  - Controls allow selecting preset initial conditions (e.g., hot center, hot edge)
+  - Simulation runs stably for reasonable parameter values
+  - Visualization updates in real-time as parameters change
+  - Reset button restores default state
+  - URL updates correctly when navigating to/from thermal workspace
+simple_vs_proposed: |
+  SIMPLE SOLUTION: 
+  - Extend existing 1D heat solver to 2D using simple finite differences
+  - Reuse FractalWorkspace UI pattern for controls and canvas
+  - Add basic controls for alpha and initial condition selection
+  - Use existing mathlab infrastructure
+  
+  PROPOSED SOLUTION:
+  - Create new 2D explicit finite difference solver for heat equation
+  - Build ThermalWorkspace component following FractalWorkspace pattern
+  - Add parameter controls (alpha, boundary conditions, initial condition)
+  - Integrate with existing workspace routing system
+  
+  RECOMMENDATION: PROPOSED SOLUTION (it is the simple solution - reusing existing patterns and infrastructure)
+proportionality: PROPORTIONATE
+blockers: []
+recommendation: Implement the Thermal Lab workspace as described, starting with the routing and basic structure, then implementing the 2D heat solver, and finally building the UI component
+next_action: Delegate to Builder to implement steps 1-4 (routing updates and basic solver structure)

@@ -14,6 +14,7 @@ export const SEGMENT_TO_MODE: Record<string, AppMode> = {
   inspector: "inspector",
   notebook: "notebook",
   docs: "docs",
+  thermal: "thermal",
 };
 
 /** AppMode → URL segment. "home" is absent (maps to base /simulator). */
@@ -30,6 +31,7 @@ export const MODE_TO_SEGMENT: Partial<Record<AppMode, string>> = {
   inspector: "inspector",
   notebook: "notebook",
   docs: "docs",
+  thermal: "thermal",
 };
 
 /**

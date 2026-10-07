@@ -62,6 +62,11 @@ const WORKSPACE_META: Record<string, { title: string; description: string; keywo
     description: "Literate mathematical computing notebook. Write, compute and share reproducible mathematical experiments with live output.",
     keywords: ["math notebook", "computational notebook", "reproducible math", "mathematical computing", "jupyter alternative"],
   },
+  thermal: {
+    title: "Thermal Lab — Heat Equation Solver",
+    description: "Interactive 2D heat equation simulator. Simulate heat distribution, thermal diffusion, and boundary conditions.",
+    keywords: ["heat equation", "thermal simulation", "thermal diffusion", "pde solver", "thermal lab"],
+  },
   docs: {
     title: "Math Documentation — Reference & Guide",
     description: "Bilingual mathematical reference documentation covering calculus, linear algebra, ODEs, cellular automata and more.",
