@@ -1,0 +1,41 @@
+task_id: TASK-thermal-lab-rebuild
+from_agent: builder
+to_agent: orchestrator
+status: IMPLEMENTED
+summary: Implemented Thermal Lab workspace rebuild addressing foundation fixes and beginning thermal field model implementation. Added derived fields computation (gradient, Laplacian, heat flux), visualization enhancements (vector fields, coordinate axes, legend), probe functionality with live updates, and completed foundation fixes including individual rx/ry display.
+work_completed:
+  - Foundation Fixes Completed:
+    * Data Contract Compliance: Verified Grid1D contract usage (xMin, xMax, nx) throughout
+    * Time State Management: currentTimeIndex starts at 0, clamping logic, proper playback 0→1→2→...→N
+    * Numerical Stability & Defaults: Safety margin defaults, stability rx/ry/rx+ry display (now showing individual rx and ry), max stable dt, current dt
+    * Error Handling: Structured error exposure with detailed SimulationErrorDisplay
+  - Thermal Field Model Implementation (Phase 2):
+    * Derived Fields Computation: Added functions to compute gradient (∇T), gradient magnitude (|∇T|), Laplacian (∇²T), and heat flux (q = -k∇T with k=1)
+    * Vector Field Visualization: Optional gradient vectors (green) and heat flux vectors (red) on decimated grid with arrow heads
+    * Coordinate Axes: Added labeled x and y axes with ticks and values
+    * Temperature Scale Legend: Added color bar legend with min/max labels
+  - Interactive Features (Phase 4):
+    * Probe Functionality: Click/tap to show position, temperature, gradient components, gradient magnitude, heat flux components, heat flux magnitude
+    * Live Updates: Probe data updates in real-time as simulation progresses
+    * Visualization Toggles: Added controls to switch between gradient and heat flux vector display
+  - UI Enhancements:
+    * Probe Display: Information panel showing probe data in top-left when active
+    * Improved Stability Display: Shows individual rx, ry, and rx+ry values
+files_changed:
+  - /home/fellcrack/Trabajo/Personal/Proyects/Axiom-Simulator/src/simulator/components/thermal/ThermalWorkspace.tsx: Major enhancements including derived fields computation, vector field visualization, coordinate axes, temperature legend, probe functionality with live updates, and UI improvements
+tests:
+  added_or_changed: []
+  command: npm test
+  result: PASS
+  evidence:
+    Test Files 136 passed (136)
+    Tests  1648 passed (1648)
+    Start at  16:28:38
+    Duration  10.91s (transform 6.92s, setup 0ms, collect 24.58s, tests 14.36s, environment 42ms, prepare 19.03s)
+findings:
+  - Foundation fixes largely already implemented; focused on completing missing pieces (individual rx/ry display) and beginning thermal field model
+  - All existing tests pass, indicating no regressions introduced
+  - Build succeeds without errors
+blockers: []
+recommendation: Ready for Optimizer review. The implementation addresses all foundation fixes and begins thermal field model implementation as requested. Consider adding isotherms (contour visualization) and further performance optimizations in future iterations.
+next_action: Proceed to Optimizer for performance review

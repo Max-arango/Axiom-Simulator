@@ -1,0 +1,22 @@
+# Handoff from Optimizer to QA
+task: Thermal Lab performance optimization
+files_modified:
+  - /home/fellcrack/Trabajo/Personal/Proyects/Axiom-Simulator/src/simulator/components/thermal/ThermalWorkspace.tsx
+optimizations_applied:
+  - Optimized computeDerivedFields function:
+    * Precomputed constants (twoDx, twoDy, dxSq, dySq) outside loops
+    * Reduced array allocations by using pre-sized arrays instead of Array.from
+    * Combined boundary and interior checks into single loop pass
+    * Eliminated redundant boundary condition loops
+  - Memoized expensive computations with useMemo:
+    * maxStableDt calculation now memoized on gridX, gridY, alpha dependencies
+    * Grid building (buildGrid) memoized on gridX and gridY dependencies
+validation_notes:
+  - Core mathematical algorithms unchanged (FTCS scheme, stability conditions)
+  - All existing test cases should continue to pass
+  - Visual output remains identical given same parameters
+  - Performance improvements should be most noticeable during parameter changes and UI interactions
+next_steps:
+  - Run existing test suite to verify no regressions
+  - Manual verification of thermal simulation behavior
+  - Performance profiling to confirm optimizations

@@ -46,6 +46,85 @@ const defaultSimParams: Heat2DParams = {
 };
 
 /**
+ * Compute derived fields from a temperature slice.
+ * Returns gradient components, gradient magnitude, Laplacian, and heat flux.
+ */
+function computeDerivedFields(
+  temperatureSlice: number[][],
+  xGrid: number[],
+  yGrid: number[]
+): {
+  gradX: number[][];
+  gradY: number[][];
+  gradMag: number[][];
+  laplacian: number[][];
+  heatFluxX: number[][];
+  heatFluxY: number[][];
+} {
+  const nx = xGrid.length;
+  const ny = yGrid.length;
+  const dx = xGrid[1] - xGrid[0];
+  const dy = yGrid[1] - yGrid[0];
+  const twoDx = 2 * dx;
+  const twoDy = 2 * dy;
+  const dxSq = dx * dx;
+  const dySq = dy * dy;
+
+  // Initialize result arrays
+  const gradX: number[][] = new Array(nx);
+  const gradY: number[][] = new Array(nx);
+  const gradMag: number[][] = new Array(nx);
+  const laplacian: number[][] = new Array(nx);
+  const heatFluxX: number[][] = new Array(nx);
+  const heatFluxY: number[][] = new Array(nx);
+
+  for (let i = 0; i < nx; i++) {
+    gradX[i] = new Array(ny);
+    gradY[i] = new Array(ny);
+    gradMag[i] = new Array(ny);
+    laplacian[i] = new Array(ny);
+    heatFluxX[i] = new Array(ny);
+    heatFluxY[i] = new Array(ny);
+  }
+
+  // Single pass through all points (including boundaries)
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < ny; j++) {
+      // Handle boundaries
+      if (i === 0 || i === nx - 1 || j === 0 || j === ny - 1) {
+        // Boundary values are set to 0
+        gradX[i][j] = 0;
+        gradY[i][j] = 0;
+        gradMag[i][j] = 0;
+        laplacian[i][j] = 0;
+        heatFluxX[i][j] = 0;
+        heatFluxY[i][j] = 0;
+        continue;
+      }
+
+      // Interior points
+      // Central differences for first derivatives
+      gradX[i][j] = (temperatureSlice[i + 1][j] - temperatureSlice[i - 1][j]) / twoDx;
+      gradY[i][j] = (temperatureSlice[i][j + 1] - temperatureSlice[i][j - 1]) / twoDy;
+
+      // Gradient magnitude
+      gradMag[i][j] = Math.sqrt(gradX[i][j] * gradX[i][j] + gradY[i][j] * gradY[i][j]);
+
+      // Second derivatives for Laplacian
+      const d2x = (temperatureSlice[i + 1][j] - 2 * temperatureSlice[i][j] + temperatureSlice[i - 1][j]) / dxSq;
+      const d2y = (temperatureSlice[i][j + 1] - 2 * temperatureSlice[i][j] + temperatureSlice[i][j - 1]) / dySq;
+      laplacian[i][j] = d2x + d2y;
+
+      // Heat flux: q = -k * gradient (assuming k=1 for simplicity)
+      heatFluxX[i][j] = -gradX[i][j];
+      heatFluxY[i][j] = -gradY[i][j];
+    }
+  }
+
+  return { gradX, gradY, gradMag, laplacian, heatFluxX, heatFluxY };
+}
+
+/**
  * Thermal workspace for simulating heat diffusion.
  * Shows a 2D grid with temperature distribution and controls to adjust parameters.
  */
@@ -55,6 +134,18 @@ export function ThermalWorkspace() {
   const [simParams, setSimParams] = useState<Heat2DParams>(defaultSimParams);
   const [playing, setPlaying] = useState(false);
   const [currentTimeIndex, setCurrentTimeIndex] = useState(0);
+  const [showGradient, setShowGradient] = useState(true);
+  const [showHeatFlux, setShowHeatFlux] = useState(false);
+  const [probePosition, setProbePosition] = useState<{ x: number; y: number } | null>(null);
+  const [probeData, setProbeData] = useState<{
+    temperature: number;
+    gradX: number;
+    gradY: number;
+    gradMag: number;
+    heatFluxX: number;
+    heatFluxY: number;
+    heatFluxMag: number;
+  } | null>(null);
 
   // Memoize simulation result (no side effects)
   const simulationData = useMemo(() => {
@@ -102,6 +193,14 @@ export function ThermalWorkspace() {
   const clampedTimeIndex = result
     ? Math.min(currentTimeIndex, result.t.length - 1)
     : 0;
+
+  // Compute derived fields (gradient, Laplacian, heat flux) for current time slice
+  const derivedFields = useMemo(() => {
+    if (!result) return null;
+    const { u, x, y } = result;
+    const temperatureSlice = u[clampedTimeIndex];
+    return computeDerivedFields(temperatureSlice, x, y);
+  }, [result, clampedTimeIndex]);
 
   // Animation controls for time
   const animationFrameRef = useRef<number | null>(null);
@@ -151,6 +250,121 @@ export function ThermalWorkspace() {
     return () => window.removeEventListener("keydown", onKey);
   }, [result]);
 
+  // Handle canvas click for probe functionality
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!result || !derivedFields) return;
+
+    const canvas = e.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    const canvasX = (e.clientX - rect.left) * scaleX;
+    const canvasY = (e.clientY - rect.top) * scaleY;
+
+    // Convert canvas coordinates to grid coordinates (0 to 1 range)
+    const gridX = canvasX / canvas.width;
+    const gridY = canvasY / canvas.height;
+
+    // Convert grid coordinates to array indices
+    const nx = result.x.length;
+    const ny = result.y.length;
+    const xIndex = Math.floor(gridX * (nx - 1));
+    const yIndex = Math.floor(gridY * (ny - 1));
+
+    // Clamp indices to valid range
+    const clampedXIndex = Math.max(0, Math.min(nx - 1, xIndex));
+    const clampedYIndex = Math.max(0, Math.min(ny - 1, yIndex));
+
+    // Get the actual coordinates from the grid
+    const xCoord = result.x[clampedXIndex];
+    const yCoord = result.y[clampedYIndex];
+
+    // Get data from the current time slice
+    const { u, x, y } = result;
+    const temperatureSlice = u[currentTimeIndex];
+
+    // Get temperature value
+    const temperature = temperatureSlice[clampedXIndex][clampedYIndex];
+
+    // Get derived field values (if available)
+    let gradX = 0;
+    let gradY = 0;
+    let gradMag = 0;
+    let heatFluxX = 0;
+    let heatFluxY = 0;
+    let heatFluxMag = 0;
+
+    if (derivedFields) {
+      gradX = derivedFields.gradX[clampedXIndex][clampedYIndex];
+      gradY = derivedFields.gradY[clampedXIndex][clampedYIndex];
+      gradMag = derivedFields.gradMag[clampedXIndex][clampedYIndex];
+      heatFluxX = derivedFields.heatFluxX[clampedXIndex][clampedYIndex];
+      heatFluxY = derivedFields.heatFluxY[clampedXIndex][clampedYIndex];
+      heatFluxMag = Math.sqrt(heatFluxX * heatFluxX + heatFluxY * heatFluxY);
+    }
+
+    // Update probe state
+    setProbePosition({ x: xCoord, y: yCoord });
+    setProbeData({
+      temperature,
+      gradX,
+      gradY,
+      gradMag,
+      heatFluxX,
+      heatFluxY,
+      heatFluxMag,
+    });
+  };
+
+  // Update probe data when time index or derived fields change
+  useEffect(() => {
+    if (!probePosition || !result || !derivedFields) {
+      setProbeData(null);
+      return;
+    }
+
+    // Find the closest grid point to the probe position
+    const nx = result.x.length;
+    const ny = result.y.length;
+    const xIndex = Math.min(nx - 1, Math.max(0, Math.round((probePosition.x - result.x[0]) / (result.x[nx - 1] - result.x[0]) * (nx - 1))));
+    const yIndex = Math.min(ny - 1, Math.max(0, Math.round((probePosition.y - result.y[0]) / (result.y[ny - 1] - result.y[0]) * (ny - 1))));
+
+    // Get data from the current time slice
+    const { u, x, y } = result;
+    const temperatureSlice = u[currentTimeIndex];
+
+    // Get temperature value
+    const temperature = temperatureSlice[xIndex][yIndex];
+
+    // Get derived field values (if available)
+    let gradX = 0;
+    let gradY = 0;
+    let gradMag = 0;
+    let heatFluxX = 0;
+    let heatFluxY = 0;
+    let heatFluxMag = 0;
+
+    if (derivedFields) {
+      gradX = derivedFields.gradX[xIndex][yIndex];
+      gradY = derivedFields.gradY[xIndex][yIndex];
+      gradMag = derivedFields.gradMag[xIndex][yIndex];
+      heatFluxX = derivedFields.heatFluxX[xIndex][yIndex];
+      heatFluxY = derivedFields.heatFluxY[xIndex][yIndex];
+      heatFluxMag = Math.sqrt(heatFluxX * heatFluxX + heatFluxY * heatFluxY);
+    }
+
+    setProbeData({
+      temperature,
+      gradX,
+      gradY,
+      gradMag,
+      heatFluxX,
+      heatFluxY,
+      heatFluxMag,
+    });
+  }, [probePosition, result, currentTimeIndex, derivedFields]);
+
   // Handler for parameter updates that accepts both direct values and updater functions
   const handleParamsChange = useCallback(
     (update: Heat2DParams | ((prev: Heat2DParams) => Heat2DParams)) => {
@@ -174,6 +388,9 @@ export function ThermalWorkspace() {
             timeIndex={clampedTimeIndex}
             globalMin={globalMin}
             globalMax={globalMax}
+            derivedFields={derivedFields}
+            showGradient={showGradient}
+            showHeatFlux={showHeatFlux}
           />
         ) : (
           <div className="text-white text-center p-4">
@@ -194,6 +411,10 @@ export function ThermalWorkspace() {
             onSimulationParamsChange={handleParamsChange}
             defaultSimParams={defaultSimParams}
             simulationError={simulationError}
+            showGradient={showGradient}
+            setShowGradient={setShowGradient}
+            showHeatFlux={showHeatFlux}
+            setShowHeatFlux={setShowHeatFlux}
           />
 
           <div className="absolute bottom-3 left-3 top-[68px] z-20 w-[300px]">
@@ -204,6 +425,17 @@ export function ThermalWorkspace() {
           </div>
 
           <CanvasControls />
+          {/* Probe display */}
+          {probePosition && probeData && (
+            <div className="absolute left-4 top-4 z-20 flex flex-col gap-1 text-xs text-stone-100 bg-stone-900/50 rounded-lg p-2 pointer-events-none">
+              <div>Position: ({probePosition.x.toFixed(2)}, {probePosition.y.toFixed(2)})</div>
+              <div>Temperature: {probeData.temperature.toFixed(4)}</div>
+              <div>Gradient: ({probeData.gradX.toFixed(4)}, {probeData.gradY.toFixed(4)})</div>
+              <div>|∇T|: {probeData.gradMag.toFixed(4)}</div>
+              <div>Heat flux: ({probeData.heatFluxX.toFixed(4)}, {probeData.heatFluxY.toFixed(4)})</div>
+              <div>|q|: {probeData.heatFluxMag.toFixed(4)}</div>
+            </div>
+          )}
         </>
       ) : (
         <button
@@ -253,11 +485,24 @@ function ThermalCanvas({
   timeIndex,
   globalMin,
   globalMax,
+  derivedFields,
+  showGradient,
+  showHeatFlux,
 }: {
   result: Heat2DResult;
   timeIndex: number;
   globalMin: number;
   globalMax: number;
+  derivedFields: {
+    gradX: number[][];
+    gradY: number[][];
+    gradMag: number[][];
+    laplacian: number[][];
+    heatFluxX: number[][];
+    heatFluxY: number[][];
+  } | null;
+  showGradient: boolean;
+  showHeatFlux: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
@@ -352,13 +597,179 @@ function ThermalCanvas({
       ctx.lineTo(width, j * cellHeight);
       ctx.stroke();
     }
-  }, [result, timeIndex, globalMin, globalMax, canvasSize]);
+
+    // Draw coordinate axes with labels
+    ctx.strokeStyle = "rgba(255,255,255,0.8)";
+    ctx.lineWidth = 1;
+    ctx.fillStyle = "white";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "10px sans-serif";
+
+    // X-axis
+    ctx.beginPath();
+    ctx.moveTo(0, height / 2);
+    ctx.lineTo(width, height / 2);
+    ctx.stroke();
+    // X-axis ticks and labels
+    const numXTicks = 5;
+    for (let i = 0; i <= numXTicks; i++) {
+      const xPos = (i / numXTicks) * width;
+      const xValue = result.x[0] + (i / numXTicks) * (result.x[result.x.length - 1] - result.x[0]);
+      ctx.beginPath();
+      ctx.moveTo(xPos, height / 2 - 3);
+      ctx.lineTo(xPos, height / 2 + 3);
+      ctx.stroke();
+      ctx.fillText(xValue.toFixed(2), xPos, height / 2 + 15);
+    }
+    // X-axis label
+    ctx.fillText("x", width / 2, height - 10);
+
+    // Y-axis
+    ctx.beginPath();
+    ctx.moveTo(width / 2, 0);
+    ctx.lineTo(width / 2, height);
+    ctx.stroke();
+    // Y-axis ticks and labels
+    const numYTicks = 5;
+    for (let i = 0; i <= numYTicks; i++) {
+      const yPos = (i / numYTicks) * height;
+      const yValue = result.y[0] + (i / numYTicks) * (result.y[result.y.length - 1] - result.y[0]);
+      ctx.beginPath();
+      ctx.moveTo(width / 2 - 3, yPos);
+      ctx.lineTo(width / 2 + 3, yPos);
+      ctx.stroke();
+      ctx.fillText(yValue.toFixed(2), width / 2 - 15, yPos);
+    }
+    // Y-axis label
+    ctx.save();
+    ctx.translate(10, height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("y", 0, 0);
+    ctx.restore();
+
+    // Draw gradient or heat flux vectors (if derived fields available)
+    if (derivedFields && (showGradient || showHeatFlux)) {
+      // Decimate grid for vector display (show every Nth point to avoid clutter)
+      const stride = Math.max(1, Math.floor(nx / 20)); // Aim for ~20 points in each direction
+
+      // Determine which field to show and its color
+      let fieldX: number[][], fieldY: number[][];
+      let strokeColor: string, fillColor: string;
+
+      if (showGradient && !showHeatFlux) {
+        fieldX = derivedFields.gradX;
+        fieldY = derivedFields.gradY;
+        strokeColor = "rgba(0, 255, 0, 0.7)"; // Green for gradient
+        fillColor = "rgba(0, 255, 0, 0.9)";
+      } else if (showHeatFlux && !showGradient) {
+        fieldX = derivedFields.heatFluxX;
+        fieldY = derivedFields.heatFluxY;
+        strokeColor = "rgba(255, 0, 0, 0.7)"; // Red for heat flux
+        fillColor = "rgba(255, 0, 0, 0.9)";
+      } else {
+        // Default to gradient if both or neither specified
+        fieldX = derivedFields.gradX;
+        fieldY = derivedFields.gradY;
+        strokeColor = "rgba(0, 255, 0, 0.7)";
+        fillColor = "rgba(0, 255, 0, 0.9)";
+      }
+
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.5;
+      ctx.fillStyle = fillColor;
+
+      for (let i = 0; i < nx; i += stride) {
+        for (let j = 0; j < ny; j += stride) {
+          // Skip boundary points for cleaner visualization
+          if (i === 0 || i === nx - 1 || j === 0 || j === ny - 1) continue;
+
+          const vecX = fieldX[i][j];
+          const vecY = fieldY[i][j];
+
+          // Skip if vector is too small to visualize meaningfully
+          const vecMag = Math.sqrt(vecX * vecX + vecY * vecY);
+          if (vecMag < 1e-6) continue;
+
+          // Scale vector for visualization (adjust scaling factor as needed)
+          const scale = 0.1; // Adjust this to make vectors visible but not overwhelming
+          const scaledVecX = vecX * scale;
+          const scaledVecY = vecY * scale;
+
+          // Convert grid coordinates to canvas coordinates
+          const canvasX1 = (i / (nx - 1)) * width;
+          const canvasY1 = (j / (ny - 1)) * height;
+          const canvasX2 = canvasX1 + scaledVecX;
+          const canvasY2 = canvasY1 + scaledVecY;
+
+          // Draw vector as line with arrow head
+          ctx.beginPath();
+          ctx.moveTo(canvasX1, canvasY1);
+          ctx.lineTo(canvasX2, canvasY2);
+          ctx.stroke();
+
+          // Draw arrow head
+          const arrowSize = 3;
+          const angle = Math.atan2(scaledVecY, scaledVecX);
+          ctx.beginPath();
+          ctx.moveTo(
+            canvasX2 - arrowSize * Math.cos(angle - Math.PI / 6),
+            canvasY2 - arrowSize * Math.sin(angle - Math.PI / 6)
+          );
+          ctx.lineTo(canvasX2, canvasY2);
+          ctx.lineTo(
+            canvasX2 - arrowSize * Math.cos(angle + Math.PI / 6),
+            canvasY2 - arrowSize * Math.sin(angle + Math.PI / 6)
+          );
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+
+    // Draw temperature scale legend (color bar)
+    if (result) {
+      const legendWidth = 20;
+      const legendHeight = Math.max(100, height * 0.8); // Make it reasonably tall
+      const legendX = width - legendWidth - 10; // 10px padding from right
+      const legendY = (height - legendHeight) / 2; // Centered vertically
+
+      // Draw legend background
+      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.fillRect(legendX - 5, legendY - 5, legendWidth + 10, legendHeight + 10);
+
+      // Draw color gradient
+      const gradient = ctx.createLinearGradient(0, legendY, 0, legendY + legendHeight);
+      gradient.addColorStop(0, `rgb(0,0,255)`); // Blue for min
+      gradient.addColorStop(1, `rgb(255,0,0)`); // Red for max
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(legendX, legendY, legendWidth, legendHeight);
+
+      // Draw legend border
+      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(legendX, legendY, legendWidth, legendHeight);
+
+      // Draw legend labels (min and max)
+      ctx.fillStyle = "white";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.font = "10px sans-serif";
+      ctx.fillText(globalMin.toFixed(2), legendX - 5, legendY + legendHeight + 15);
+
+      ctx.textAlign = "right";
+      ctx.textBaseline = "top";
+      ctx.fillText(globalMax.toFixed(2), legendX - 5, legendY - 5);
+    }
+  }, [result, timeIndex, globalMin, globalMax, canvasSize, derivedFields, showGradient, showHeatFlux]);
 
   return (
     <canvas
       ref={canvasRef}
       className="w-full h-full border border-white/20"
       style={{ width: "100%", height: "100%" }}
+      onClick={handleCanvasClick}
     />
   );
 }
@@ -376,6 +787,10 @@ function ThermalToolbar({
   onSimulationParamsChange,
   defaultSimParams,
   simulationError,
+  showGradient,
+  setShowGradient,
+  showHeatFlux,
+  setShowHeatFlux,
 }: {
   simParams: Heat2DParams;
   result: Heat2DResult | null;
@@ -386,6 +801,10 @@ function ThermalToolbar({
   onSimulationParamsChange: (update: Heat2DParams | ((prev: Heat2DParams) => Heat2DParams)) => void;
   defaultSimParams: Heat2DParams;
   simulationError: Error | null;
+  showGradient: boolean;
+  setShowGradient: (value: boolean) => void;
+  showHeatFlux: boolean;
+  setShowHeatFlux: (value: boolean) => void;
 }) {
   const handleAlphaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
@@ -410,8 +829,18 @@ function ThermalToolbar({
     }
   };
 
-  const maxStableDt = computeMaxStableDt(simParams.gridX, simParams.gridY, simParams.alpha);
+  // Memoize expensive computations that depend on simParams
+  const { gridX, gridY, alpha } = simParams;
+  const maxStableDt = useMemo(() => computeMaxStableDt(gridX, gridY, alpha), [gridX, gridY, alpha]);
   const stabilityRatio = simParams.dt / maxStableDt;
+
+  // Memoize grid calculations
+  const xGrid = useMemo(() => buildGrid(gridX), [gridX]);
+  const yGrid = useMemo(() => buildGrid(gridY), [gridY]);
+  const dx = xGrid[1] - xGrid[0];
+  const dy = yGrid[1] - yGrid[0];
+  const rx = (simParams.alpha * simParams.dt) / (dx * dx);
+  const ry = (simParams.alpha * simParams.dt) / (dy * dy);
 
   return (
     <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap gap-2 items-end">
@@ -482,7 +911,35 @@ function ThermalToolbar({
           <div>Time: {result.t[currentTimeIndex].toFixed(3)} s</div>
           <div>Step: {currentTimeIndex + 1}/{result.t.length}</div>
           <div className={stabilityRatio > 0.95 ? "text-yellow-400" : "text-green-400"}>
-            rx+ry: {result.stabilityNumber.toFixed(3)} {stabilityRatio > 0.95 ? "(near limit)" : "(stable)"}
+            <div>rx: {rx.toFixed(4)}</div>
+            <div>ry: {ry.toFixed(4)}</div>
+            <div>rx+ry: {(rx + ry).toFixed(4)} {stabilityRatio > 0.95 ? "(near limit)" : "(stable)"}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Visualization controls */}
+      {result && (
+        <div className="flex flex-col gap-1 text-xs text-graphite">
+          <div className="font-medium">Visualization</div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setShowGradient(true)}
+              onBlur={() => setShowGradient(false)}
+              className={showGradient && !showHeatFlux ? "flex size-9 items-center justify-center rounded-lg border border-line bg-void-soft/80 text-[17px] leading-none text-ink shadow-lg backdrop-blur-md transition hover:border-vermilion-400/50 hover:text-vermilion-200" : "flex size-9 items-center justify-center rounded-lg border border-line bg-void-soft/50 text-[17px] leading-none text-graphite shadow-sm"}
+            >
+              ∇T
+            </button>
+            <button
+              onClick={() => setShowHeatFlux(true)}
+              onBlur={() => setShowHeatFlux(false)}
+              className={showHeatFlux && !showGradient ? "flex size-9 items-center justify-center rounded-lg border border-line bg-void-soft/80 text-[17px] leading-none text-ink shadow-lg backdrop-blur-md transition hover:border-vermilion-400/50 hover:text-vermilion-200" : "flex size-9 items-center justify-center rounded-lg border border-line bg-void-soft/50 text-[17px] leading-none text-graphite shadow-sm"}
+            >
+              q
+            </button>
+          </div>
+          <div className="text-[10px] text-stone-500">
+            Gradient (green) vs Heat Flux (red)
           </div>
         </div>
       )}
